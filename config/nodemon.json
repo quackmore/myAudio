@@ -1,0 +1,6 @@
+{
+  "watch": [
+    "*.*"
+    ],
+  "ext": "css, html, js, json, mjs, ejs"
+}

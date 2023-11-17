@@ -1,0 +1,23 @@
+{
+    "db": {
+        "database": "iot",
+        "host": "scellino",
+        "port": 5432,
+        "user": "archimede"
+    },
+    "httpd": {
+        "port": 3000
+    },
+    "logger": {
+        "console_log": "ON",
+        "log_path": "local-log"
+    },
+    "repository": {
+        "basePath": "/home/pcentena/tmp",
+        "tracksDir": "/Tracks"
+    },
+    "cookingData": {
+        "eleSmoothingMA_VR": 12,
+        "eleSmoothingMA_TK": 16
+    }
+}

@@ -1,0 +1,27 @@
+{
+    "db": {
+        "database": "iot",
+        "host": "localhost",
+        "port": 5432,
+        "user": "archimede"
+    },
+    "httpd": {
+        "port": 3020
+    },
+    "logger": {
+        "console_log": "OFF",
+        "log_path": "/var/log/production"
+    },
+    "iotDevices": {
+        "es-timer": "192.168.1.105",
+        "thermostat": "192.168.1.187",
+        "battery": "Bme280",
+        "insideTemp": "TST-Rovetta",
+        "insideHumi": "TST-Rovetta",
+        "insideHeater": "TST-Rovetta",
+        "insideTempSetpoint": "TST-Rovetta",
+        "insideTSTmode": "TST-Rovetta",
+        "outsideTemp": "Bme280",
+        "outsideHumi": "Bme280"
+    }
+}
