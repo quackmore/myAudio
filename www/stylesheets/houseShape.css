@@ -1,0 +1,52 @@
+.house {
+    position: relative;
+    background-image: linear-gradient(rgb(35, 128, 235) 60%, #cee5fc);
+    /*height: 100%;
+    min-width: 480px;*/
+    flex-grow: 2;
+    z-index: -2;
+}
+
+.houseInside {
+    position: relative;
+    bottom: 10px;
+    left: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 60%;
+    width: 80%;
+    border-radius: 5%;
+    background-image: radial-gradient(rgb(252, 235, 203)50%, rgb(253, 119, 30));
+    clip-path: polygon(5% 100%, 95% 100%, 95% 30%, 100% 30%, 50% 0%, 25% 15%, 25% 10%, 10% 10%, 10% 24%, 0% 30%, 5% 30%);
+    font-size: 1.8em;
+    font-weight: bold;
+    z-index: -1;
+}
+
+.houseOutside {
+    position: relative;
+    top: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: end;
+    align-items: center;
+    font-size: 1.8em;
+    font-weight: bold;
+    color: white;
+    width: 45%;
+    float: right;
+}
+
+.houseLine {
+    height: 1.5em;
+}
+
+.unitFont {
+    font-size: 0.8em;
+}
+
+.smallFont {
+    font-size: 0.6em;
+}

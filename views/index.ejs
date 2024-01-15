@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('./partials/_common_head'); %>
+</head>
+
+<body>
+  <div id="spinnerMod" class="overlay">
+    <div class="spinner">
+    </div>
+  </div>
+  <div class="firstLine" style="border:1px solid blue;">
+    <div class="lineF">
+      <div class="lineL">
+        <select class="myselect" name="audioSel" id="outSel" onchange="refreshStatus()">
+          <option value="bt">Bluetooth</option>
+          <option value="spkrs">Speakers</option>
+        </select>
+
+        <label class="switch">
+          <input id="outSwitch" type="checkbox" onchange="outSwitch()">
+          <span class="slider round"></span>
+        </label>
+        <div><i class="fa-regular fa-toggle-on fa-2xl" style="color: #2196F3;"></i>
+          <i class="fa-regular fa-toggle-off fa-2xl" style="color: #2196F3;"></i></div>
+        <span id="btDevDesc"></span>
+      </div>
+      <div class="lineR">
+        <i id="outCfg" onclick="openBtDevMod()" class="fa-regular fa-gear"></i>
+      </div>
+    </div>
+    <div class="lineF" style="margin: 20px 1px 10px 5px">
+      <div class="lineL" style="gap: 20px">
+        <i id="volSt" class="fa-solid fa-volume-xmark"></i>
+        <!-- fa-volume-high -->
+        <i id="volPlus" class="fa-solid fa-plus"></i>
+      </div>
+      <div class="volSlider">
+        <input type="range" min="1" max="100" value="30" class="slider" id="volRange">
+      </div>
+      <div class="lineR">
+        <i id="volMinus" class="fa-solid fa-minus"></i>
+      </div>
+    </div>
+  </div>
+  <!-- bluetooth device list modal -->
+  <div class="modalBox" id="btDevMod">
+    <div>
+      <div class="lineF firstLine">
+        <span>Devices</span>
+        <div class="lineR">
+          <i onclick="closeBtDevMod()" class="fa-regular fa-xmark"></i>
+        </div>
+      </div>
+      <div id="btDevList">
+        <div class="lineF">
+          <span>Device 1</span>
+          <div class="lineR">
+            <i class="fa-regular fa-trash-can"></i>
+          </div>
+        </div>
+        <div class="lineF">
+          <span>Device lunghissima</span>
+          <span>&emsp;&emsp;</span>
+          <div class="lineR">
+            <i class="fa-regular fa-trash-can"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- end of bluetooth device list modal -->
+
+
+  <div class="lineF firstLine" style="border:1px solid blue; margin-top: 2px;">
+    <span>another line</span>
+  </div>
+
+  <!-- SCRIPTS-->
+  <%- include('./partials/_helpers'); %>
+
+    <script>
+      var audioOut = {};
+
+      const getSpeakerStatus = () => {
+        return toutFetch(`http://${audioOut.speakers.contactDevice}/auxContactsStatus`, 5000)
+          .then(res => res.json())
+          .then(data => audioOut.speakers.speakerOn = (data.aux_contacts_status[audioOut.speakers.contactRelay] === 'closed' ? 'on' : 'off'))
+      }
+
+      const getBtStatus = () => {
+        return toutFetch(`/bt/status`, 5000)
+          .then(res => res.json())
+          .then(data => audioOut.bt = data)
+      }
+
+      const getBtDevices = () => {
+        return toutFetch(`/bt/devices`, 5000)
+          .then(res => res.json())
+          .then(data => audioOut.bt.devices = data)
+      }
+
+      const showOutCfg = () => {
+        if (document.getElementById('outSel').value === 'spkrs') {
+          document.getElementById("outCfg").style.visibility = "hidden";
+          document.getElementById("outCfg").style.opacity = 0;
+        }
+        else {
+          if (audioOut.bt.Powered === 'yes') {
+            document.getElementById("outCfg").style.visibility = "visible";
+            document.getElementById("outCfg").style.opacity = 1;
+          } else {
+            document.getElementById("outCfg").style.visibility = "hidden";
+            document.getElementById("outCfg").style.opacity = 0;
+          }
+        }
+      }
+
+      const outSwitch = async () => {
+        let req = "";
+        let url = ""
+        if (document.getElementById('outSel').value === 'spkrs') {
+          req = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: `{"aux_contacts_status": "${audioOut.speakers.speakerOn === 'on' ? "open" : "closed"}"}`
+          };
+          url = `http://${audioOut.speakers.contactDevice}/auxContactsStatus?${new URLSearchParams({ "id": audioOut.speakers.contactRelay })}`;
+        } else {
+          req = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          };
+          url = `/bt/status/power/${audioOut.bt.Powered === 'yes' ? 'off' : 'on'}`;
+        }
+        try {
+          await toutFetch(url, 5000, req);
+          refreshStatus();
+        }
+        catch (err) {
+          alert(err.message);
+        }
+      }
+
+      const connectDev = async (idx) => {
+        loadSpinner();
+        toutFetch(`/bt/device/connect/${audioOut.bt.devices[idx].address}`, 60000, {
+          method: 'POST'
+        })
+          .then(() => {
+            closeBtDevMod();
+            refreshStatus();
+          })
+          .catch((err) => alert(`Failed to connect to ${audioOut.bt.devices[idx].name}: ${err.message}`))
+          .finally(() => unloadSpinner());
+      }
+
+      const deleteDev = async (idx) => {
+        toutFetch(`/bt/device/remove/${audioOut.bt.devices[idx].address}`, 60000, {
+          method: 'POST'
+        })
+          .then(() => refreshStatus())
+          .catch((err) => alert(`Failed to remove ${audioOut.bt.devices[idx].name}: ${err.message}`));
+      }
+
+      const refreshStatus = async () => {
+        try {
+          await getSpeakerStatus();
+          await getBtStatus();
+          await getBtDevices();
+          // console.log(audioOut);
+          if (firstTime) {
+            document.getElementById('outSel').value = 'spkrs';
+            if (audioOut.bt.Powered === 'yes') document.getElementById('outSel').value = 'bt';
+            firstTime = false;
+          }
+          showOutCfg();
+          if (document.getElementById('outSel').value === 'spkrs') {
+            document.getElementById('outSwitch').checked = (audioOut.speakers.speakerOn === 'on' ? true : false);
+            document.getElementById('btDevDesc').innerText = "";
+          } else {
+            document.getElementById('outSwitch').checked = (audioOut.bt.Powered === 'yes' ? true : false);
+            let btDevList = document.getElementById('btDevList');
+            btDevList.innerHTML = "";
+            let connectedDev = -1;
+            for (let [idx, dev] of audioOut.bt.devices.entries()) {
+              if (dev.connected === 'yes') connectedDev = idx;
+              btDevList.innerHTML += `<div class="lineF"><span onclick="connectDev(${idx})">${dev.name}</span><span>&emsp;&emsp;</span><div class="lineR"><i class="fa-regular fa-trash-can" onclick="deleteDev(${idx})"></i></div>`;
+            }
+            if (connectedDev >= 0)
+              document.getElementById('btDevDesc').innerText = `${audioOut.bt.devices[connectedDev].name} [${audioOut.bt.devices[connectedDev].battery}]`;
+            else
+              document.getElementById('btDevDesc').innerText = "";
+          }
+        }
+        catch (err) {
+          alert(err.message);
+        }
+      }
+
+      const openBtDevMod = () => {
+        document.getElementById("btDevMod").style.visibility = "visible";
+        document.getElementById("btDevMod").style.opacity = 1;
+        periodicRefreshStatus(3000);
+        if (audioOut.bt.Powered === 'yes') {
+          toutFetch('/bt/status/scan/on', 5000, {
+            method: 'POST'
+          })
+            // .then(() => refreshStatus())
+            .catch((err) => alert(err.message));
+        }
+      }
+
+      const closeBtDevMod = () => {
+        periodicRefreshStatus(30000);
+        document.getElementById("btDevMod").style.visibility = "hidden";
+        document.getElementById("btDevMod").style.opacity = 0;
+        if (audioOut.bt.Powered === 'yes') {
+          toutFetch('/bt/status/scan/off', 5000, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          })
+            .then(() => refreshStatus())
+            .catch((err) => alert(err.message));
+        }
+      }
+
+      let refreshInterval = null;
+      const periodicRefreshStatus = (val) => {
+        clearInterval(refreshInterval);
+        refreshInterval = setInterval(refreshStatus, val);
+      }
+
+      // STARTUP
+      let inPrefs = JSON.parse(`<%-JSON.stringify(prefs)%>`);
+      audioOut.speakers = {};
+      audioOut.speakers.contactDevice = inPrefs.audioContactDev;
+      audioOut.speakers.contactRelay = +inPrefs.audioContactRel;
+      let firstTime = true;
+
+      refreshStatus();
+      periodicRefreshStatus(30000);
+    </script>
+
+
+</body>
+
+</html>
