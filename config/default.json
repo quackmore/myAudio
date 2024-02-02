@@ -8,7 +8,7 @@
     "httpd": {
         "port": 3000
     },
-    "audioOut": {
+    "player": {
         "contactDevice": "192.168.1.185",
         "contactRelay": 2
     },
