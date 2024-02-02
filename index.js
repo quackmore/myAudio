@@ -4,6 +4,7 @@ const log = require('./logger')
 const httpd = require('./httpd/httpd')
 const config = require('config');
 const packageJSON = require("./package.json");
+const mpd = require("./mpd");
 
 log.info(`${packageJSON.name} started`);
 

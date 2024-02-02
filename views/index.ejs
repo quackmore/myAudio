@@ -6,64 +6,32 @@
 </head>
 
 <body>
+  <!-- spinner -->
   <div id="spinnerMod" class="overlay">
     <div class="spinner">
     </div>
   </div>
-  <div class="firstLine" style="border:1px solid blue;">
-    <div class="lineF">
-      <div class="lineL">
-        <select class="myselect" name="audioSel" id="outSel" onchange="refreshStatus()">
-          <option value="bt">Bluetooth</option>
-          <option value="spkrs">Speakers</option>
-        </select>
-
-        <label class="switch">
-          <input id="outSwitch" type="checkbox" onchange="outSwitch()">
-          <span class="slider round"></span>
-        </label>
-        <div><i class="fa-regular fa-toggle-on fa-2xl" style="color: #2196F3;"></i>
-          <i class="fa-regular fa-toggle-off fa-2xl" style="color: #2196F3;"></i></div>
-        <span id="btDevDesc"></span>
-      </div>
-      <div class="lineR">
-        <i id="outCfg" onclick="openBtDevMod()" class="fa-regular fa-gear"></i>
-      </div>
-    </div>
-    <div class="lineF" style="margin: 20px 1px 10px 5px">
-      <div class="lineL" style="gap: 20px">
-        <i id="volSt" class="fa-solid fa-volume-xmark"></i>
-        <!-- fa-volume-high -->
-        <i id="volPlus" class="fa-solid fa-plus"></i>
-      </div>
-      <div class="volSlider">
-        <input type="range" min="1" max="100" value="30" class="slider" id="volRange">
-      </div>
-      <div class="lineR">
-        <i id="volMinus" class="fa-solid fa-minus"></i>
-      </div>
-    </div>
-  </div>
+  <!-- end of spinner -->
   <!-- bluetooth device list modal -->
   <div class="modalBox" id="btDevMod">
     <div>
-      <div class="lineF firstLine">
+      <div class="justify firstLine">
         <span>Devices</span>
-        <div class="lineR">
+        <div class="right">
           <i onclick="closeBtDevMod()" class="fa-regular fa-xmark"></i>
         </div>
       </div>
-      <div id="btDevList">
-        <div class="lineF">
+      <div id="btDevList" style="padding-top: 10px; padding-bottom: 20px;">
+        <div class="justify">
           <span>Device 1</span>
-          <div class="lineR">
+          <div class="right">
             <i class="fa-regular fa-trash-can"></i>
           </div>
         </div>
-        <div class="lineF">
+        <div class="justify">
           <span>Device lunghissima</span>
           <span>&emsp;&emsp;</span>
-          <div class="lineR">
+          <div class="right">
             <i class="fa-regular fa-trash-can"></i>
           </div>
         </div>
@@ -71,34 +39,129 @@
     </div>
   </div>
   <!-- end of bluetooth device list modal -->
+  <!-- volume modal -->
+  <div class="modalBox" id="volumeMod">
+    <div>
+      <div class="justify firstLine">
+        <span class="left">Volume</span>
+        <div class="right">
+          <i onclick="closeVolumeMod()" class="fa-regular fa-xmark"></i>
+        </div>
+      </div>
+      <div class="justify" style="padding-top: 10px; padding-bottom: 20px;">
+        <div class=" left">
+          <span id="volMute" onclick="volumeToggleMute()">
+            <i class="fa-solid fa-volume-xmark"></i>
+            <!-- fa-volume-high -->
+          </span>
+          <i id="volMinus" class="fa-solid fa-minus" onclick="volumeDec()"></i>
+        </div>
+        <div class="volSlider">
+          <input type="range" min="1" max="100" value="0" class="slider" id="volRange" disabled onchange="volumeSet()">
+        </div>
+        <div class="right">
+          <i id="volPlus" class="fa-solid fa-plus" onclick="volumeInc()"></i>
+        </div>
+      </div>
 
+    </div>
+  </div>
+  <!-- end of volume modal -->
+  <div class="column fullHeight">
+    <div class="firstLine center" style="border:1px solid blue;">
+      <div class="column fixedWidth">
+        <div class="justify">
+          <div class="left">
+            <select class="myselect" name="audioSel" id="outSel" onchange="refreshStatus()">
+              <option value="bt">Bluetooth</option>
+              <option value="spkrs">Speakers</option>
+            </select>
+            <div id="outSwitch" onclick="outSwitch()"></div>
+            <div class="left" id="btDevDesc" style="font-size: small"></div>
+          </div>
+          <div class="right">
+            <i id="outCfg" onclick="openBtDevMod()" class="fa-regular fa-gear"></i>
+          </div>
+        </div>
+        <div class="center" style="padding: 10px;">
+          <span id="song" style="font-size: small;">Author - Song description - Album</span>
+        </div>
+        <div class="center" style="gap: 10px;">
+          <div class="left" style="width: 60%;">
+            <input type="range" min="1" max="100" value="0" class="slider" id="elapsed">
+          </div>
+          <span class="right" style="font-size: small;" id="duration">00:00 - 00:00</span>
+        </div>
+        <div class="justify" style="padding-top: 10px;">
+          <div class="justify" style="padding-left: 40px; padding-right: 40px;">
+            <i class="fa-solid fa-shuffle fa-xs" style="color: lightgray;" id="shuffle" onclick="toggleShuffle()"></i>
+            <i class="fa-solid fa-backward-step fa-sm" id="previous" onclick="mpdCmd('previous',[])"></i>
+            <!-- <i class="fa-solid fa-play fa-xl"></i> -->
+            <i class="fa-solid fa-pause fa-xl" id="play" onclick="togglePlay()"></i>
+            <i class="fa-solid fa-forward-step fa-sm" id="next" onclick="mpdCmd('next',[])"></i>
+            <i class="fa-solid fa-repeat fa-xs" style="color: lightgray;" id="repeat" onclick="toggleRepeat()"></i>
+            <i class="fa-solid fa-1 fa-xs" style="color: lightgray;" id="single" onclick="toggleSingle()"></i>
+          </div>
+          <div class="right" style="padding-right: 20px;">
+            <div class="left">
+              <span id="volMute2" onclick="volumeToggleMute()">
+                <i class="fa-solid fa-volume-xmark"></i>
+                <!-- fa-volume-high -->
+              </span>
+            </div>
+            <div class="right">
+              <span id="volLevel" onclick="openVolumeMod()">50</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  <div class="lineF firstLine" style="border:1px solid blue; margin-top: 2px;">
-    <span>another line</span>
+    <div style="border:1px solid blue; margin-top: 2px; margin-bottom: 15%; flex-grow: 1;">
+    </div>
   </div>
 
   <!-- SCRIPTS-->
   <%- include('./partials/_helpers'); %>
 
     <script>
-      var audioOut = {};
+      var player = {};
+
+      const mpdCmd = (cmd, options) => {
+        let req = {
+          method: 'POST'
+        };
+        url = `/mpd/cmd/${cmd}`;
+        for (opt of options)
+          url += `/${opt}`;
+        toutFetch(url, 5000, req)
+          .then(res => res.json())
+          .then(data => refreshStatus())
+          .catch(err => alert(err.message));
+      }
 
       const getSpeakerStatus = () => {
-        return toutFetch(`http://${audioOut.speakers.contactDevice}/auxContactsStatus`, 5000)
+        return toutFetch(`http://${player.speakers.contactDevice}/auxContactsStatus`, 5000)
           .then(res => res.json())
-          .then(data => audioOut.speakers.speakerOn = (data.aux_contacts_status[audioOut.speakers.contactRelay] === 'closed' ? 'on' : 'off'))
+          .then(data => player.speakers.speakerOn = (data.aux_contacts_status[player.speakers.contactRelay] === 'closed' ? 'on' : 'off'))
       }
 
       const getBtStatus = () => {
         return toutFetch(`/bt/status`, 5000)
           .then(res => res.json())
-          .then(data => audioOut.bt = data)
+          .then(data => player.bt = data)
       }
 
       const getBtDevices = () => {
         return toutFetch(`/bt/devices`, 5000)
           .then(res => res.json())
-          .then(data => audioOut.bt.devices = data)
+          .then(data => player.bt.devices = data)
+      }
+
+      const getMpdStatus = () => {
+        return toutFetch(`/mpd/status`, 5000)
+          .then(res => res.json())
+          .then(data => player.mpd = data)
       }
 
       const showOutCfg = () => {
@@ -107,7 +170,7 @@
           document.getElementById("outCfg").style.opacity = 0;
         }
         else {
-          if (audioOut.bt.Powered === 'yes') {
+          if (player.bt.Powered === 'yes') {
             document.getElementById("outCfg").style.visibility = "visible";
             document.getElementById("outCfg").style.opacity = 1;
           } else {
@@ -124,15 +187,15 @@
           req = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: `{"aux_contacts_status": "${audioOut.speakers.speakerOn === 'on' ? "open" : "closed"}"}`
+            body: `{"aux_contacts_status": "${player.speakers.speakerOn === 'on' ? "open" : "closed"}"}`
           };
-          url = `http://${audioOut.speakers.contactDevice}/auxContactsStatus?${new URLSearchParams({ "id": audioOut.speakers.contactRelay })}`;
+          url = `http://${player.speakers.contactDevice}/auxContactsStatus?${new URLSearchParams({ "id": player.speakers.contactRelay })}`;
         } else {
           req = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
           };
-          url = `/bt/status/power/${audioOut.bt.Powered === 'yes' ? 'off' : 'on'}`;
+          url = `/bt/status/power/${player.bt.Powered === 'yes' ? 'off' : 'on'}`;
         }
         try {
           await toutFetch(url, 5000, req);
@@ -145,23 +208,151 @@
 
       const connectDev = async (idx) => {
         loadSpinner();
-        toutFetch(`/bt/device/connect/${audioOut.bt.devices[idx].address}`, 60000, {
+        toutFetch(`/bt/device/connect/${player.bt.devices[idx].address}`, 60000, {
           method: 'POST'
         })
           .then(() => {
             closeBtDevMod();
             refreshStatus();
           })
-          .catch((err) => alert(`Failed to connect to ${audioOut.bt.devices[idx].name}: ${err.message}`))
+          .catch((err) => alert(`Failed to connect to ${player.bt.devices[idx].name}: ${err.message}`))
           .finally(() => unloadSpinner());
       }
 
       const deleteDev = async (idx) => {
-        toutFetch(`/bt/device/remove/${audioOut.bt.devices[idx].address}`, 60000, {
+        toutFetch(`/bt/device/remove/${player.bt.devices[idx].address}`, 60000, {
           method: 'POST'
         })
           .then(() => refreshStatus())
-          .catch((err) => alert(`Failed to remove ${audioOut.bt.devices[idx].name}: ${err.message}`));
+          .catch((err) => alert(`Failed to remove ${player.bt.devices[idx].name}: ${err.message}`));
+      }
+
+      const devOnline = (idx) => {
+        if (player.bt.devices[idx].online)
+          return player.bt.devices[idx].online === "yes" ? "[online]" : "";
+        return "";
+      }
+
+      const updateSpeakers = () => {
+        if (!player.speakers) return;
+        document.getElementById('outSwitch').innerHTML = (player.speakers.speakerOn === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
+        document.getElementById('btDevDesc').innerHTML = "";
+      }
+
+      const updateBT = () => {
+        if (!player.bt) return;
+        document.getElementById('outSwitch').innerHTML = (player.bt.Powered === 'yes' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
+        let btDevList = document.getElementById('btDevList');
+        btDevList.innerHTML = "";
+        let connectedDev = -1;
+        for (let [idx, dev] of player.bt.devices.entries()) {
+          if (dev.connected === 'yes') connectedDev = idx;
+          btDevList.innerHTML += `<div class="justify"><span onclick="connectDev(${idx})">${dev.name}</span><span>&emsp;&emsp;</span><span class="right">${devOnline(idx)}</span><span class="right"><i class="fa-regular fa-trash-can" onclick="deleteDev(${idx})"></i></span>`;
+        }
+        if (connectedDev >= 0) {
+          document.getElementById('btDevDesc').innerHTML = `<span>${player.bt.devices[connectedDev].name}</span><i class="fa-regular fa-battery-three-quarters"></i><span>${player.bt.devices[connectedDev].battery ? player.bt.devices[connectedDev].battery : ""}</span>`;
+          if (player.bt.devices[connectedDev].volume) {
+            document.getElementById('volRange').value = player.bt.devices[connectedDev].volume.split("%")[0];
+            document.getElementById('volLevel').innerText = player.bt.devices[connectedDev].volume.split("%")[0];
+            document.getElementById('volRange').disabled = false;
+          }
+          if (player.bt.devices[connectedDev].mute) {
+            document.getElementById('volMute').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark"></i>' : '<i class="fa-solid fa-volume-high"></i>';
+            document.getElementById('volMute2').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark"></i>' : '<i class="fa-solid fa-volume-high"></i>';
+          }
+        }
+        else {
+          document.getElementById('btDevDesc').innerHTML = "";
+          document.getElementById('volRange').value = 0;
+          document.getElementById('volRange').disabled = true;
+          document.getElementById('volLevel').innerText = 0;
+          document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+          document.getElementById('volMute2').innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+        }
+      }
+
+      const updateMpd = () => {
+        if (!player.mpd) return;
+        if (player.mpd.curSong) {
+          let desc = `${player.mpd.curSong.AlbumArtist} - ${player.mpd.curSong.Title} [${player.mpd.curSong.Album}]`;
+          if (desc.length > 58)
+            desc = `<center>${player.mpd.curSong.AlbumArtist}</center>\n<center>${player.mpd.curSong.Title}</center>\n<center>[${player.mpd.curSong.Album}]</center>`;
+          document.getElementById('song').innerHTML = desc;
+        }
+        if (player.mpd.status) {
+          document.getElementById('elapsed').value = 100 * parseFloat(player.mpd.status.elapsed) / parseFloat(player.mpd.status.duration);
+          if (player.mpd.status.random === '1')
+            document.getElementById('shuffle').style.color = null;
+          else
+            document.getElementById('shuffle').style.color = 'lightgray';
+          if (player.mpd.status.repeat === '1')
+            document.getElementById('repeat').style.color = null;
+          else
+            document.getElementById('repeat').style.color = 'lightgray';
+          if (player.mpd.status.single === '1')
+            document.getElementById('single').style.color = null;
+          else
+            document.getElementById('single').style.color = 'lightgray';
+          if (player.mpd.status.state === 'play') {
+            document.getElementById('play').className = "fa-solid fa-pause fa-xl";
+            refreshElapsed();
+            setUpdateElapsed(1000);
+          } else {
+            document.getElementById('play').className = "fa-solid fa-play fa-xl";
+            setUpdateElapsed(0);
+          }
+        }
+      }
+
+      const refreshElapsed = () => {
+        if (!player.mpd || !player.mpd.status) return;
+        let elapsed = parseFloat(player.mpd.status.elapsed) + 1.0;
+        let duration = parseFloat(player.mpd.status.duration);
+        let eh = Math.trunc(elapsed / 3600);
+        let em = Math.trunc((elapsed % 3600) / 60);
+        let es = Math.trunc((elapsed % 3600) % 60);
+        let dh = Math.trunc(duration / 3600);
+        let dm = Math.trunc((duration % 3600) / 60);
+        let ds = Math.trunc((duration % 3600) % 60);
+        document.getElementById('duration').innerText = `${eh > 0 ? eh + ":" : ""}${String(em).padStart(2, '0')}:${String(es).padStart(2, '0')} - ${dh > 0 ? dh + ":" : ""}${String(dm).padStart(2, '0')}:${String(ds).padStart(2, '0')}`;
+        if (elapsed >= duration)
+          refreshStatus();
+        else {
+          player.mpd.status.elapsed = elapsed.toString();
+          document.getElementById('elapsed').value = 100 * elapsed / duration;
+        }
+      }
+
+      const toggleShuffle = () => {
+        if (!player.mpd) return;
+        if (player.mpd.status.random === '1')
+          mpdCmd('random', ['0']);
+        else
+          mpdCmd('random', ['1']);
+      }
+
+      const togglePlay = () => {
+        if (!player.mpd) return;
+        if (player.mpd.status.state === 'play')
+          mpdCmd('pause', []);
+        else
+          mpdCmd('play', []);
+      }
+
+      const toggleRepeat = () => {
+        if (!player.mpd) return;
+        if (player.mpd.status.repeat === '1')
+          mpdCmd('repeat', ['0']);
+        else
+          mpdCmd('repeat', ['1']);
+      }
+
+      const toggleSingle = () => {
+        if (!player.mpd) return;
+        if (player.mpd.status.single === '1')
+          mpdCmd('single', ['0']);
+        else
+          mpdCmd('single', ['1']);
       }
 
       const refreshStatus = async () => {
@@ -169,46 +360,106 @@
           await getSpeakerStatus();
           await getBtStatus();
           await getBtDevices();
-          // console.log(audioOut);
+          await getMpdStatus();
+          console.log(player);
           if (firstTime) {
             document.getElementById('outSel').value = 'spkrs';
-            if (audioOut.bt.Powered === 'yes') document.getElementById('outSel').value = 'bt';
+            if (player.bt.Powered === 'yes') document.getElementById('outSel').value = 'bt';
             firstTime = false;
           }
           showOutCfg();
-          if (document.getElementById('outSel').value === 'spkrs') {
-            document.getElementById('outSwitch').checked = (audioOut.speakers.speakerOn === 'on' ? true : false);
-            document.getElementById('btDevDesc').innerText = "";
-          } else {
-            document.getElementById('outSwitch').checked = (audioOut.bt.Powered === 'yes' ? true : false);
-            let btDevList = document.getElementById('btDevList');
-            btDevList.innerHTML = "";
-            let connectedDev = -1;
-            for (let [idx, dev] of audioOut.bt.devices.entries()) {
-              if (dev.connected === 'yes') connectedDev = idx;
-              btDevList.innerHTML += `<div class="lineF"><span onclick="connectDev(${idx})">${dev.name}</span><span>&emsp;&emsp;</span><div class="lineR"><i class="fa-regular fa-trash-can" onclick="deleteDev(${idx})"></i></div>`;
-            }
-            if (connectedDev >= 0)
-              document.getElementById('btDevDesc').innerText = `${audioOut.bt.devices[connectedDev].name} [${audioOut.bt.devices[connectedDev].battery}]`;
-            else
-              document.getElementById('btDevDesc').innerText = "";
-          }
+          if (document.getElementById('outSel').value === 'spkrs')
+            updateSpeakers();
+          else
+            updateBT();
+          updateMpd();
         }
         catch (err) {
           alert(err.message);
         }
       }
 
-      const openBtDevMod = () => {
-        document.getElementById("btDevMod").style.visibility = "visible";
-        document.getElementById("btDevMod").style.opacity = 1;
-        periodicRefreshStatus(3000);
-        if (audioOut.bt.Powered === 'yes') {
-          toutFetch('/bt/status/scan/on', 5000, {
+      const findBTconnectedDev = async () => {
+        for (dev of player.bt.devices)
+          if (dev.connected === "yes" && dev.volCtrl) return dev;
+        return {};
+      }
+
+      const volumeSet = async () => {
+        if (document.getElementById('outSel').value === 'spkrs') {
+          return;
+        } else {
+          let dev = await findBTconnectedDev();
+          if (Object.keys(dev).length === 0) return;
+          let vol = document.getElementById('volRange').value;
+          if (`${vol}%` !== dev.volume)
+            toutFetch(`/bt/volume/set/${dev.address}/${vol}%25`, 60000, {
+              method: 'POST'
+            })
+              .then(() => refreshStatus())
+              .catch((err) => alert(`Failed to set ${dev.name} volume to ${vol} - ${err.message}`));
+        }
+      }
+
+      const volumeInc = async () => {
+        if (document.getElementById('volRange').disabled) return;
+        if (document.getElementById('outSel').value === 'spkrs') {
+          return;
+        } else {
+          let dev = await findBTconnectedDev();
+          if (Object.keys(dev).length === 0) return;
+          toutFetch(`/bt/volume/inc/${dev.address}`, 60000, {
             method: 'POST'
           })
-            // .then(() => refreshStatus())
-            .catch((err) => alert(err.message));
+            .then(() => refreshStatus())
+            .catch((err) => alert(`Failed to increment ${dev.name} volume - ${err.message}`));
+        }
+      }
+
+      const volumeDec = async () => {
+        if (document.getElementById('volRange').disabled) return;
+        if (document.getElementById('outSel').value === 'spkrs') {
+          return;
+        } else {
+          let dev = await findBTconnectedDev();
+          if (Object.keys(dev).length === 0) return;
+          toutFetch(`/bt/volume/dec/${dev.address}`, 60000, {
+            method: 'POST'
+          })
+            .then(() => refreshStatus())
+            .catch((err) => alert(`Failed to increment ${dev.name} volume - ${err.message}`));
+        }
+      }
+
+      const volumeToggleMute = async () => {
+        if (document.getElementById('outSel').value === 'spkrs') {
+          return;
+        } else {
+          let dev = await findBTconnectedDev();
+          if (Object.keys(dev).length === 0) return;
+          if (dev.mute)
+            toutFetch(`/bt/volume/set/${dev.address}/${dev.mute === "yes" ? "unmute" : "mute"}`, 60000, {
+              method: 'POST'
+            })
+              .then(() => refreshStatus())
+              .catch((err) => alert(`Failed to set ${dev.name} volume to ${vol} - ${err.message}`));
+        }
+      }
+
+      const openBtDevMod = () => {
+        if (document.getElementById("btDevMod").style.visibility !== "visible") {
+          document.getElementById("btDevMod").style.visibility = "visible";
+          document.getElementById("btDevMod").style.opacity = 1;
+          periodicRefreshStatus(3000);
+          if (player.bt.Powered === 'yes') {
+            toutFetch('/bt/status/scan/on', 5000, {
+              method: 'POST'
+            })
+              // .then(() => refreshStatus())
+              .catch((err) => alert(err.message));
+          }
+        } else {
+          closeBtDevMod();
         }
       }
 
@@ -216,7 +467,7 @@
         periodicRefreshStatus(30000);
         document.getElementById("btDevMod").style.visibility = "hidden";
         document.getElementById("btDevMod").style.opacity = 0;
-        if (audioOut.bt.Powered === 'yes') {
+        if (player.bt.Powered === 'yes') {
           toutFetch('/bt/status/scan/off', 5000, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
@@ -224,6 +475,27 @@
             .then(() => refreshStatus())
             .catch((err) => alert(err.message));
         }
+      }
+
+      const openVolumeMod = () => {
+        if (document.getElementById("volumeMod").style.visibility !== "visible") {
+          document.getElementById("volumeMod").style.visibility = "visible";
+          document.getElementById("volumeMod").style.opacity = 1;
+        } else {
+          closeVolumeMod();
+        }
+      }
+
+      const closeVolumeMod = () => {
+        document.getElementById("volumeMod").style.visibility = "hidden";
+        document.getElementById("volumeMod").style.opacity = 0;
+      }
+
+      let updateElapsed = null;
+      const setUpdateElapsed = (val) => {
+        clearInterval(updateElapsed);
+        if (val > 0)
+          updateElapsed = setInterval(refreshElapsed, val);
       }
 
       let refreshInterval = null;
@@ -234,9 +506,9 @@
 
       // STARTUP
       let inPrefs = JSON.parse(`<%-JSON.stringify(prefs)%>`);
-      audioOut.speakers = {};
-      audioOut.speakers.contactDevice = inPrefs.audioContactDev;
-      audioOut.speakers.contactRelay = +inPrefs.audioContactRel;
+      player.speakers = {};
+      player.speakers.contactDevice = inPrefs.audioContactDev;
+      player.speakers.contactRelay = +inPrefs.audioContactRel;
       let firstTime = true;
 
       refreshStatus();

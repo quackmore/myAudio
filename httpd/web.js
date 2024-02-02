@@ -4,6 +4,7 @@ const path = require('path');
 const morgan = require('morgan');
 
 const btRouter = require('../api/bt');
+const mpdRouter = require('../api/mpd');
 const homeRouter = require('../api/home');
 const req = require('express/lib/request');
 
@@ -21,5 +22,6 @@ web.use(express.static('www'));
 
 web.use('/', homeRouter);
 web.use('/bt', btRouter);
+web.use('/mpd', mpdRouter);
 
 module.exports = web;

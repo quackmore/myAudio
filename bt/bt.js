@@ -144,6 +144,8 @@ module.exports = {
           dev.trusted = line.toString().split(': ')[1];
         if (line.toString().includes("Connected"))
           dev.connected = line.toString().split(': ')[1];
+        if (line.toString().includes("RSSI"))
+          dev.online = "yes";
       }
       error = "";
       for await (const chunk of bthCmd.stderr) {
@@ -162,18 +164,18 @@ module.exports = {
     // end of "bluetoothctl info <device>"
     for (dev of devices) {
       if (dev.connected === "yes") {
-        bthCmd = spawn("amixer", ["-D", "bluealsa"]);
+        // get controls
+        bthCmd = spawn("amixer", ["-D", "bluealsa", "scontrols"]);
         data = "";
         for await (const chunk of bthCmd.stdout)
           data += chunk;
-        if (data.toString().length > 10) {
-          let batLevel = "";
-          for (line of data.toString().split('\n')) {
-            if (line.length < 2) continue;
-            batLevel = line.toString();
-          }
-          dev.battery = batLevel.match(/\[(.*?)\]/)[1];
-        } error = "";
+        for (line of data.toString().split('\n')) {
+          if (line.toString().includes("A2DP"))
+            dev.volCtrl = line.toString().split("'")[1];
+          if (line.toString().includes("Battery"))
+            dev.batCtrl = line.toString().split("'")[1];
+        }
+        error = "";
         for await (const chunk of bthCmd.stderr) {
           error += chunk;
         }
@@ -182,9 +184,67 @@ module.exports = {
         });
 
         if (exitCode) {
-          let msg = `amixer -D bluealsa got ${data} - ${error}`;
+          let msg = `amixer -D bluealsa scontrols got ${data} - ${error}`;
           log.error(msg);
           throw new Error(msg);
+        }
+        // get battery
+        if (dev.batCtrl) {
+          let batCtrl = `"${dev.batCtrl}"`;
+          bthCmd = spawn("amixer", ["-D", "bluealsa", "sget", batCtrl]);
+          data = "";
+          for await (const chunk of bthCmd.stdout)
+            data += chunk;
+          let batLevel = "";
+          for (line of data.toString().split('\n')) {
+            if (line.toString().length < 2) continue;
+            batLevel = line.toString();
+          }
+          if (batLevel.length > 5)
+            dev.battery = batLevel.match(/\[(.*?)\]/)[1];
+          error = "";
+          for await (const chunk of bthCmd.stderr) {
+            error += chunk;
+          }
+          exitCode = await new Promise((resolve, reject) => {
+            bthCmd.on('close', resolve);
+          });
+
+          if (exitCode) {
+            let msg = `amixer -D bluealsa sget '${dev.batCtrl}' got ${data} - ${error}`;
+            log.error(msg);
+            throw new Error(msg);
+          }
+        }
+        // get playback volume
+        if (dev.volCtrl) {
+          let volCtrl = `"${dev.volCtrl}"`;
+          bthCmd = spawn("amixer", ["-D", "bluealsa", "sget", volCtrl]);
+          data = "";
+          for await (const chunk of bthCmd.stdout)
+            data += chunk;
+          let volLevel = "";
+          for (line of data.toString().split('\n')) {
+            if (line.toString().length < 2) continue;
+            volLevel = line.toString();
+          }
+          if (volLevel.length > 5) {
+            dev.volume = volLevel.match(/\[(.*?)\]/)[1];
+            dev.mute = volLevel.match(/\[on\]/) ? "no" : "yes";
+          }
+          error = "";
+          for await (const chunk of bthCmd.stderr) {
+            error += chunk;
+          }
+          exitCode = await new Promise((resolve, reject) => {
+            bthCmd.on('close', resolve);
+          });
+
+          if (exitCode) {
+            let msg = `amixer -D bluealsa sget '${dev.volCtrl}' got ${data} - ${error}`;
+            log.error(msg);
+            throw new Error(msg);
+          }
         }
       }
     }
@@ -301,6 +361,147 @@ module.exports = {
       let msg = `bluetoothctl remove ${address} got ${data} - ${error}`;
       log.error(msg);
       throw new Error(msg);
+    }
+    return data;
+  },
+  volumeSet: async (address, value) => {
+    let devs = await module.exports.devices();
+    let found = false;
+    let volCtrl = "";
+    let volLev = "";
+    for (dev of devs)
+      if (dev.address === address && dev.connected === "yes") {
+        found = true;
+        volCtrl = dev.volCtrl;
+        volLev = dev.volume;
+      }
+    if (!found) return "invalid address";
+    // set playback volume
+    if (volCtrl && volLev != value) {
+      let volCtrlStr = `"${volCtrl}"`;
+      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, value]);
+      data = "";
+      for await (const chunk of bthCmd.stdout)
+        data += chunk;
+      error = "";
+      for await (const chunk of bthCmd.stderr) {
+        error += chunk;
+      }
+      exitCode = await new Promise((resolve, reject) => {
+        bthCmd.on('close', resolve);
+      });
+
+      if (exitCode) {
+        let msg = `amixer -D bluealsa sset ${volCtrlStr} ${value} got ${data} - ${error}`;
+        log.error(msg);
+        throw new Error(msg);
+      }
+    }
+    return data;
+  },
+  volumeInc: async (address) => {
+    let devs = await module.exports.devices();
+    let found = false;
+    let volCtrl = "";
+    let volLev = "";
+    for (dev of devs)
+      if (dev.address === address && dev.connected === "yes") {
+        found = true;
+        volCtrl = dev.volCtrl;
+        volLev = dev.volume;
+      }
+    if (!found) return "invalid address";
+    // set playback volume
+    if (volCtrl && volLev != "100%") {
+      let volCtrlStr = `"${volCtrl}"`;
+      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, "1%+"]);
+      data = "";
+      for await (const chunk of bthCmd.stdout)
+        data += chunk;
+      error = "";
+      for await (const chunk of bthCmd.stderr) {
+        error += chunk;
+      }
+      exitCode = await new Promise((resolve, reject) => {
+        bthCmd.on('close', resolve);
+      });
+
+      if (exitCode) {
+        let msg = `amixer -D bluealsa sset ${volCtrlStr} 1%+ got ${data} - ${error}`;
+        log.error(msg);
+        throw new Error(msg);
+      }
+    }
+    return data;
+  },
+  volumeDec: async (address) => {
+    let devs = await module.exports.devices();
+    let found = false;
+    let volCtrl = "";
+    let volLev = "";
+    for (dev of devs)
+      if (dev.address === address && dev.connected === "yes") {
+        found = true;
+        volCtrl = dev.volCtrl;
+        volLev = dev.volume;
+      }
+    if (!found) return "invalid address";
+    // set playback volume
+    if (volCtrl && volLev != "0%") {
+      let volCtrlStr = `"${volCtrl}"`;
+      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, "1%-"]);
+      data = "";
+      for await (const chunk of bthCmd.stdout)
+        data += chunk;
+      error = "";
+      for await (const chunk of bthCmd.stderr) {
+        error += chunk;
+      }
+      exitCode = await new Promise((resolve, reject) => {
+        bthCmd.on('close', resolve);
+      });
+
+      if (exitCode) {
+        let msg = `amixer -D bluealsa sset ${volCtrlStr} 1%- got ${data} - ${error}`;
+        log.error(msg);
+        throw new Error(msg);
+      }
+    }
+    return data;
+  },
+  volumeMute: async (address, val) => {
+    let devs = await module.exports.devices();
+    let found = false;
+    let volCtrl = "";
+    let volLev = "";
+    for (dev of devs)
+      if (dev.address === address && dev.connected === "yes") {
+        found = true;
+        volCtrl = dev.volCtrl;
+        volLev = dev.volume;
+      }
+    if (!found) return "invalid address";
+    if (val !== "mute" && val !== "unmute") return "invalid command";
+    // val = "mute" || "unmute"
+    if (volCtrl && volLev != "0%") {
+      let volCtrlStr = `"${volCtrl}"`;
+      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, val]);
+      data = "";
+      for await (const chunk of bthCmd.stdout)
+        data += chunk;
+      error = "";
+      for await (const chunk of bthCmd.stderr) {
+        error += chunk;
+      }
+      exitCode = await new Promise((resolve, reject) => {
+        bthCmd.on('close', resolve);
+      });
+
+      if (exitCode) {
+        let msg = `amixer -D bluealsa sset ${volCtrlStr} [mute|unmute] got ${data} - ${error}`;
+        log.error(msg);
+        throw new Error(msg);
+      }
     }
     return data;
   }
