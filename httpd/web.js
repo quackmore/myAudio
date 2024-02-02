@@ -13,7 +13,10 @@ const web = express();
 web.set('view engine', 'ejs');
 web.set('views', path.join(process.cwd(), 'views'));
 
-web.use(morgan('dev'));
+if (process.env.NODE_ENV === 'development')
+    web.use(morgan('dev'));
+else
+    web.use(morgan('combined'));
 web.use(express.json());
 web.use(express.urlencoded({ extended: false }));
 // web.use(cookieParser());
