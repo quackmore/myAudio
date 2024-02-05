@@ -88,7 +88,8 @@
         </div>
         <div class="center" style="gap: 10px;">
           <div class="left" style="width: 60%;">
-            <input type="range" min="1" max="100" value="0" class="slider" id="elapsed">
+            <input type="range" min="1" max="100" value="0" class="slider" id="elapsed"
+              onchange="setPosition(this.value)" onmousedown="setUpdateElapsed(0);" onmouseup="setUpdateElapsed(1000);">
           </div>
           <span class="right" style="font-size: small;" id="duration">00:00 - 00:00</span>
         </div>
@@ -274,12 +275,13 @@
       const updateMpd = () => {
         if (!player.mpd) return;
         if (player.mpd.curSong) {
-          let desc = `${player.mpd.curSong.AlbumArtist} - ${player.mpd.curSong.Title} [${player.mpd.curSong.Album}]`;
+          let desc = `${player.mpd.curSong.Artist} - ${player.mpd.curSong.Title} [${player.mpd.curSong.Album}]`;
           if (desc.length > 58)
-            desc = `<center>${player.mpd.curSong.AlbumArtist}</center>\n<center>${player.mpd.curSong.Title}</center>\n<center>[${player.mpd.curSong.Album}]</center>`;
+            desc = `<center>${player.mpd.curSong.Artist}</center>\n<center>${player.mpd.curSong.Title}</center>\n<center>[${player.mpd.curSong.Album}]</center>`;
           document.getElementById('song').innerHTML = desc;
         }
         if (player.mpd.status) {
+          if (player.mpd.status.error) alert(player.mpd.status.error);
           document.getElementById('elapsed').value = 100 * parseFloat(player.mpd.status.elapsed) / parseFloat(player.mpd.status.duration);
           if (player.mpd.status.random === '1')
             document.getElementById('shuffle').style.color = null;
@@ -302,6 +304,13 @@
             setUpdateElapsed(0);
           }
         }
+      }
+
+      const setPosition = async (perc) => {
+        setUpdateElapsed(0);
+        let duration = parseFloat(player.mpd.status.duration);
+        await mpdCmd('seekcur', [duration * perc / 100]);
+        setUpdateElapsed(1000);
       }
 
       const refreshElapsed = () => {

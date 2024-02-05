@@ -14,11 +14,14 @@ router.post('/cmd/:cmd/:opt1?/:opt2?/:opt3?', async function (req, res, next) {
   if (req.params.opt1) options.push(req.params.opt1);
   if (req.params.opt2) options.push(req.params.opt2);
   if (req.params.opt3) options.push(req.params.opt3);
-  let mpdStatus = await mpd.playCmd(req.params.cmd, options);
-  if (mpdStatus.lastCmdErr)
-    res.status(500).send(mpdStatus.lastCmdErr);
-  else
+  let mpdStatus = {};
+  try {
+    mpdStatus = await mpd.playCmd(req.params.cmd, options);
     res.json(mpdStatus);
+  }
+  catch (error) {
+    res.status(500).send(error.message);
+  }
 });
 
 module.exports = router;

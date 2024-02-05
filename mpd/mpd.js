@@ -1,5 +1,5 @@
-const mpd = require('mpd'),
-  cmd = mpd.cmd;
+const mpd = require('mpd');
+const cmd = mpd.cmd;
 const { resolve } = require('path');
 const log = require('../logger');
 
@@ -20,25 +20,19 @@ const parseMpd = (txt) => {
   return obj;
 }
 
-// const sendCommand = util.promisify(client.sendCommand)
-
 const updateStatus = () =>
   new Promise((resolve, reject) => {
     client.sendCommand(cmd("status", []), (err, msg) => {
       if (err) {
         log.error(err);
-        mpdSt.error = err;
         reject(err);
       } else {
-        mpdSt.error = "";
         mpdSt.status = parseMpd(msg);
         client.sendCommand(cmd("currentsong", []), (err, msg) => {
           if (err) {
             log.error(err);
-            mpdSt.error = err;
             reject(err);
           } else {
-            mpdSt.error = "";
             mpdSt.curSong = parseMpd(msg);
             resolve(mpdSt);
           }
@@ -47,17 +41,13 @@ const updateStatus = () =>
     });
   });
 
-mpdSt.error = "Not Connected";
-
 client.on('ready', () => {
   log.info("connected to mpd");
-  mpdSt.error = "";
   updateStatus();
 });
 
 client.on('error', (err) => {
   log.error(err.message);
-  mpdSt.error = err.message;
 });
 
 client.on('system', (name) => {
@@ -75,14 +65,13 @@ module.exports = {
     return updateStatus();
   },
   playCmd: async (command, options) => {
-    mpdSt.lastCmdErr = "";
-    client.sendCommand(cmd(command, options), (err, msg) => {
+    await client.sendCommand(cmd(command, options), (err, msg) => {
       if (err) {
         log.error(err.message);
-        mpdSt.lastCmdErr = err.message;
       }
     });
-    await updateStatus();
+    // return updateStatus();
+    let mpdSt = await updateStatus();
     return mpdSt;
   }
 }
