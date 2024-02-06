@@ -64,14 +64,15 @@ module.exports = {
   status: () => {
     return updateStatus();
   },
-  playCmd: async (command, options) => {
-    await client.sendCommand(cmd(command, options), (err, msg) => {
-      if (err) {
-        log.error(err.message);
-      }
-    });
-    // return updateStatus();
-    let mpdSt = await updateStatus();
-    return mpdSt;
+  playCmd: (command, options) => {
+    return new Promise((resolve, reject) => {
+      client.sendCommand(cmd(command, options), (err, msg) => {
+        if (err) {
+          log.error(err.message);
+          reject(err);
+        }
+        resolve("done");
+      });
+    })
   }
 }
