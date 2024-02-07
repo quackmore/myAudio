@@ -1,4 +1,8 @@
 const log = require('../logger')
+const cfg = require('config');
+const fs = require('fs');
+const path = require('path');
+const pkg = require('../package.json');
 const { spawn } = require("child_process");
 
 /*
@@ -25,6 +29,218 @@ autoconnect:
 var scan_status = {
   inProgress: false
 };
+
+const readCfgFile = (filename) => {
+  try {
+    file_content = fs.readFileSync(path.join(__dirname, `../config/${filename}`));
+    return JSON.parse(file_content);
+  } catch (err) {
+    log.error(err.message)
+    return "{}";
+  }
+}
+
+const saveCfgFile = (filename, content) => {
+  try {
+    fs.writeFileSync(path.join(__dirname, `../config/${filename}`), JSON.stringify(content, null, 4));
+  } catch (err) {
+    log.error(err.message)
+  }
+}
+
+
+const saveVolume = (address, value) => {
+  let content = readCfgFile(`${pkg.name}.json`);
+  if (!content.bt) content.bt = {};
+  if (!content.bt.defaultVolume) content.bt.defaultVolume = [];
+  let devFound = false;
+  for (dev of content.bt.defaultVolume)
+    if (dev.address === address) {
+      devFound = true;
+      dev.volume = value;
+    }
+  if (!devFound)
+    content.bt.defaultVolume.push({ 'address': address, 'volume': value });
+  saveCfgFile(`${pkg.name}.json`, content);
+}
+
+const saveVolumeInc = (address, value) => {
+  let content = readCfgFile(`${pkg.name}.json`);
+  if (!content.bt) content.bt = {};
+  if (!content.bt.defaultVolume) content.bt.defaultVolume = [];
+  let devFound = false;
+  for (dev of content.bt.defaultVolume)
+    if (dev.address === address) {
+      devFound = true;
+      dev.volume = `${parseInt(dev.volume.split('%')[0]) + value}%`;
+    }
+  saveCfgFile(`${pkg.name}.json`, content);
+}
+
+async function volumeSet(address, value) {
+  let devs = await module.exports.devices();
+  let found = false;
+  let volCtrl = "";
+  let volLev = "";
+  for (dev of devs)
+    if (dev.address === address && dev.connected === "yes") {
+      found = true;
+      volCtrl = dev.volCtrl;
+      volLev = dev.volume;
+    }
+  if (!found) return "invalid address";
+  // set playback volume
+  if (volCtrl && volLev != value) {
+    let volCtrlStr = `"${volCtrl}"`;
+    let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, value]);
+    data = "";
+    for await (const chunk of bthCmd.stdout)
+      data += chunk;
+    error = "";
+    for await (const chunk of bthCmd.stderr) {
+      error += chunk;
+    }
+    exitCode = await new Promise((resolve, reject) => {
+      bthCmd.on('close', resolve);
+    });
+
+    if (exitCode) {
+      let msg = `amixer -D bluealsa sset ${volCtrlStr} ${value} got ${data} - ${error}`;
+      log.error(msg);
+      throw new Error(msg);
+    }
+
+    // save default volume value
+    saveVolume(address, value);
+  }
+  return "done";
+}
+
+function autoSetVolume(address, volume) {
+  try {
+    log.info(`setting default volume to ${volume}...`);
+    volumeSet(address, volume);
+  }
+  catch (err) {
+    log.error(err.message);
+  }
+}
+
+async function deviceConnect(address) {
+  let devs = await module.exports.devices();
+  let foundDev = {};
+  for (dev of devs) {
+    if (dev.address === address) foundDev = dev;
+    if (dev.connected === "yes") {
+      if (dev.address === address)
+        return "already connected";
+      // disconnect device
+      let bthCmd = spawn("bluetoothctl", ["disconnect", dev.address]);
+      let data = "";
+      for await (const chunk of bthCmd.stdout)
+        data += chunk;
+      let error = "";
+      for await (const chunk of bthCmd.stderr) {
+        error += chunk;
+      }
+      let exitCode = await new Promise((resolve, reject) => {
+        bthCmd.on('close', resolve);
+      });
+
+      if (exitCode) {
+        let msg = `attempting to disconnect ${dev.address} got ${data} - ${error}`;
+        log.error(msg);
+        throw new Error(msg);
+      }
+    }
+  }
+  if (Object.keys(foundDev).length === 0) return "invalid address";
+  // trust device
+  if (foundDev.trusted !== "yes") {
+    let bthCmd = spawn("bluetoothctl", ["trust", address]);
+    let data = "";
+    for await (const chunk of bthCmd.stdout)
+      data += chunk;
+    let error = "";
+    for await (const chunk of bthCmd.stderr) {
+      error += chunk;
+    }
+    let exitCode = await new Promise((resolve, reject) => {
+      bthCmd.on('close', resolve);
+    });
+
+    if (exitCode) {
+      let msg = `attempting to trust ${address} got ${data} - ${error}`;
+      log.error(msg);
+      throw new Error(msg);
+    }
+  }
+  if (foundDev.paired !== "yes") {
+    let bthCmd = spawn("bluetoothctl", ["pair", address]);
+    let data = "";
+    for await (const chunk of bthCmd.stdout)
+      data += chunk;
+    let error = "";
+    for await (const chunk of bthCmd.stderr) {
+      error += chunk;
+    }
+    let exitCode = await new Promise((resolve, reject) => {
+      bthCmd.on('close', resolve);
+    });
+
+    if (exitCode) {
+      let msg = `attempting to pair ${address} got ${data} - ${error}`;
+      log.error(msg);
+      throw new Error(msg);
+    }
+  }
+  // connect device
+  bthCmd = spawn("bluetoothctl", ["connect", address]);
+  data = "";
+  for await (const chunk of bthCmd.stdout)
+    data += chunk;
+  error = "";
+  for await (const chunk of bthCmd.stderr) {
+    error += chunk;
+  }
+  exitCode = await new Promise((resolve, reject) => {
+    bthCmd.on('close', resolve);
+  });
+
+  if (exitCode) {
+    let msg = `attempting to connect ${address} got ${data} - ${error}`;
+    log.error(msg);
+    throw new Error(msg);
+  }
+
+  // save last connected device
+  let content = readCfgFile(`${pkg.name}.json`);
+  if (!content.bt) content.bt = {};
+  if (!content.bt) content.bt = {};
+  if (!content.bt.lastConnected) content.bt.lastConnected = "";
+  if (content.bt.lastConnected !== address) {
+    content.bt.lastConnected = address;
+    saveCfgFile(`${pkg.name}.json`, content);
+  }
+  // set default volume
+  if (content.bt.defaultVolume) {
+    for (dev of content.bt.defaultVolume)
+      if (dev.address === address)
+        setTimeout(autoSetVolume, 1000, address, dev.volume);
+  }
+
+  return data;
+}
+
+function autoconnect(address) {
+  try {
+    log.info(`autoconnect to ${address}...`);
+    deviceConnect(address);
+  }
+  catch (err) {
+    log.error(err.message);
+  }
+}
 
 module.exports = {
   status: async () => {
@@ -162,8 +378,10 @@ module.exports = {
       }
     }
     // end of "bluetoothctl info <device>"
+    let btConnected = false;
     for (dev of devices) {
       if (dev.connected === "yes") {
+        btConnected = true;
         // get controls
         bthCmd = spawn("amixer", ["-D", "bluealsa", "scontrols"]);
         data = "";
@@ -248,97 +466,22 @@ module.exports = {
         }
       }
     }
+    // if no device connected
+    // connect to last connected device if it's online
+    if (!btConnected) {
+      let content = readCfgFile(`${pkg.name}.json`);
+      if (!content.bt) content.bt = {};
+      if (content.bt && content.bt.lastConnected) {
+        for (dev of devices) {
+          if (dev.address === content.bt.lastConnected && dev.online === 'yes') {
+            setTimeout(autoconnect, 500, content.bt.lastConnected);
+          }
+        }
+      }
+    }
     return devices;
   },
-  deviceConnect: async (address) => {
-    let devs = await module.exports.devices();
-    let foundDev = {};
-    for (dev of devs) {
-      if (dev.address === address) foundDev = dev;
-      if (dev.connected === "yes") {
-        if (dev.address === address)
-          return "already connected";
-        // disconnect device
-        let bthCmd = spawn("bluetoothctl", ["disconnect", dev.address]);
-        let data = "";
-        for await (const chunk of bthCmd.stdout)
-          data += chunk;
-        console.log(data);
-        let error = "";
-        for await (const chunk of bthCmd.stderr) {
-          error += chunk;
-        }
-        let exitCode = await new Promise((resolve, reject) => {
-          bthCmd.on('close', resolve);
-        });
-
-        if (exitCode) {
-          let msg = `attempting to disconnect ${dev.address} got ${data} - ${error}`;
-          log.error(msg);
-          throw new Error(msg);
-        }
-      }
-    }
-    if (Object.keys(foundDev).length === 0) return "invalid address";
-    // trust device
-    if (foundDev.trusted !== "yes") {
-      let bthCmd = spawn("bluetoothctl", ["trust", address]);
-      let data = "";
-      for await (const chunk of bthCmd.stdout)
-        data += chunk;
-      let error = "";
-      for await (const chunk of bthCmd.stderr) {
-        error += chunk;
-      }
-      let exitCode = await new Promise((resolve, reject) => {
-        bthCmd.on('close', resolve);
-      });
-
-      if (exitCode) {
-        let msg = `attempting to trust ${address} got ${data} - ${error}`;
-        log.error(msg);
-        throw new Error(msg);
-      }
-    }
-    if (foundDev.paired !== "yes") {
-      let bthCmd = spawn("bluetoothctl", ["pair", address]);
-      let data = "";
-      for await (const chunk of bthCmd.stdout)
-        data += chunk;
-      let error = "";
-      for await (const chunk of bthCmd.stderr) {
-        error += chunk;
-      }
-      let exitCode = await new Promise((resolve, reject) => {
-        bthCmd.on('close', resolve);
-      });
-
-      if (exitCode) {
-        let msg = `attempting to pair ${address} got ${data} - ${error}`;
-        log.error(msg);
-        throw new Error(msg);
-      }
-    }
-    // connect device
-    bthCmd = spawn("bluetoothctl", ["connect", address]);
-    data = "";
-    for await (const chunk of bthCmd.stdout)
-      data += chunk;
-    error = "";
-    for await (const chunk of bthCmd.stderr) {
-      error += chunk;
-    }
-    exitCode = await new Promise((resolve, reject) => {
-      bthCmd.on('close', resolve);
-    });
-
-    if (exitCode) {
-      let msg = `attempting to connect ${address} got ${data} - ${error}`;
-      log.error(msg);
-      throw new Error(msg);
-    }
-    return data;
-  },
+  deviceConnect: deviceConnect,
   deviceRemove: async (address) => {
     let devs = await module.exports.devices();
     let found = false;
@@ -364,41 +507,7 @@ module.exports = {
     }
     return data;
   },
-  volumeSet: async (address, value) => {
-    let devs = await module.exports.devices();
-    let found = false;
-    let volCtrl = "";
-    let volLev = "";
-    for (dev of devs)
-      if (dev.address === address && dev.connected === "yes") {
-        found = true;
-        volCtrl = dev.volCtrl;
-        volLev = dev.volume;
-      }
-    if (!found) return "invalid address";
-    // set playback volume
-    if (volCtrl && volLev != value) {
-      let volCtrlStr = `"${volCtrl}"`;
-      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, value]);
-      data = "";
-      for await (const chunk of bthCmd.stdout)
-        data += chunk;
-      error = "";
-      for await (const chunk of bthCmd.stderr) {
-        error += chunk;
-      }
-      exitCode = await new Promise((resolve, reject) => {
-        bthCmd.on('close', resolve);
-      });
-
-      if (exitCode) {
-        let msg = `amixer -D bluealsa sset ${volCtrlStr} ${value} got ${data} - ${error}`;
-        log.error(msg);
-        throw new Error(msg);
-      }
-    }
-    return data;
-  },
+  volumeSet: volumeSet,
   volumeInc: async (address) => {
     let devs = await module.exports.devices();
     let found = false;
@@ -431,8 +540,10 @@ module.exports = {
         log.error(msg);
         throw new Error(msg);
       }
+      // save default volume value
+      saveVolumeInc(address, 1);
     }
-    return data;
+    return "done";
   },
   volumeDec: async (address) => {
     let devs = await module.exports.devices();
@@ -466,8 +577,10 @@ module.exports = {
         log.error(msg);
         throw new Error(msg);
       }
+      // save default volume value
+      saveVolumeInc(address, -1);
     }
-    return data;
+    return "done";
   },
   volumeMute: async (address, val) => {
     let devs = await module.exports.devices();
@@ -503,6 +616,6 @@ module.exports = {
         throw new Error(msg);
       }
     }
-    return data;
+    return "done";
   }
 };

@@ -1,0 +1,15 @@
+{
+    "bt": {
+        "lastConnected": "01:15:21:47:16:D4",
+        "defaultVolume": [
+            {
+                "address": "01:15:21:47:16:D4",
+                "volume": "26%"
+            },
+            {
+                "address": "95:8B:3A:57:3E:BA",
+                "volume": "19%"
+            }
+        ]
+    }
+}

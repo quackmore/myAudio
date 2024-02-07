@@ -79,9 +79,9 @@
             <div id="outSwitch" onclick="outSwitch()"></div>
             <div class="left" id="btDevDesc" style="font-size: small"></div>
           </div>
-          <div class="right">
+          <!-- <div class="right">
             <i id="outCfg" onclick="openBtDevMod()" class="fa-regular fa-gear"></i>
-          </div>
+          </div> -->
         </div>
         <div class="center" style="padding: 10px;">
           <span id="song" style="font-size: small;">Author - Song description - Album</span>
@@ -111,7 +111,7 @@
               </span>
             </div>
             <div class="right">
-              <span id="volLevel" onclick="openVolumeMod()">50</span>
+              <span id="volLevel" onclick="openVolumeMod()">0</span>
             </div>
           </div>
         </div>
@@ -167,17 +167,19 @@
 
       const showOutCfg = () => {
         if (document.getElementById('outSel').value === 'spkrs') {
-          document.getElementById("outCfg").style.visibility = "hidden";
-          document.getElementById("outCfg").style.opacity = 0;
+          // document.getElementById("outCfg").style.visibility = "hidden";
+          // document.getElementById("outCfg").style.opacity = 0;
+          closeBtDevMod();
         }
         else {
-          if (player.bt.Powered === 'yes') {
-            document.getElementById("outCfg").style.visibility = "visible";
-            document.getElementById("outCfg").style.opacity = 1;
-          } else {
-            document.getElementById("outCfg").style.visibility = "hidden";
-            document.getElementById("outCfg").style.opacity = 0;
-          }
+          // if (player.bt.Powered === 'yes') {
+          //   document.getElementById("outCfg").style.visibility = "visible";
+          //   document.getElementById("outCfg").style.opacity = 1;
+          // } else {
+          //   document.getElementById("outCfg").style.visibility = "hidden";
+          //   document.getElementById("outCfg").style.opacity = 0;
+          // }
+          if (player.bt.Powered !== 'yes') closeBtDevMod();
         }
       }
 
@@ -213,7 +215,7 @@
           method: 'POST'
         })
           .then(() => {
-            closeBtDevMod();
+            // closeBtDevMod();
             refreshStatus();
           })
           .catch((err) => alert(`Failed to connect to ${player.bt.devices[idx].name}: ${err.message}`))
@@ -238,7 +240,12 @@
         if (!player.speakers) return;
         document.getElementById('outSwitch').innerHTML = (player.speakers.speakerOn === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
         document.getElementById('btDevDesc').innerHTML = "";
+        document.getElementById('volRange').value = 0;
+        document.getElementById('volRange').disabled = true;
+        document.getElementById('volLevel').innerText = 0;
+        document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
       }
+
 
       const updateBT = () => {
         if (!player.bt) return;
@@ -251,6 +258,7 @@
           btDevList.innerHTML += `<div class="justify"><span onclick="connectDev(${idx})">${dev.name}</span><span>&emsp;&emsp;</span><span class="right">${devOnline(idx)}</span><span class="right"><i class="fa-regular fa-trash-can" onclick="deleteDev(${idx})"></i></span>`;
         }
         if (connectedDev >= 0) {
+          closeBtDevMod();
           document.getElementById('btDevDesc').innerHTML = `<span>${player.bt.devices[connectedDev].name}</span><i class="fa-regular fa-battery-three-quarters"></i><span>${player.bt.devices[connectedDev].battery ? player.bt.devices[connectedDev].battery : ""}</span>`;
           if (player.bt.devices[connectedDev].volume) {
             document.getElementById('volRange').value = player.bt.devices[connectedDev].volume.split("%")[0];
@@ -263,6 +271,7 @@
           }
         }
         else {
+          if (player.bt.Powered === 'yes') openBtDevMod();
           document.getElementById('btDevDesc').innerHTML = "";
           document.getElementById('volRange').value = 0;
           document.getElementById('volRange').disabled = true;
@@ -366,22 +375,27 @@
 
       const refreshStatus = async () => {
         try {
-          await getSpeakerStatus();
-          await getBtStatus();
-          await getBtDevices();
-          await getMpdStatus();
-          console.log(player);
           if (firstTime) {
+            await getSpeakerStatus();
+            await getBtStatus();
+            await getBtDevices();
+            await getMpdStatus();
             document.getElementById('outSel').value = 'spkrs';
             if (player.bt.Powered === 'yes') document.getElementById('outSel').value = 'bt';
             firstTime = false;
           }
-          showOutCfg();
-          if (document.getElementById('outSel').value === 'spkrs')
+          if (document.getElementById('outSel').value === 'spkrs') {
+            await getSpeakerStatus();
             updateSpeakers();
-          else
+          } else {
+            await getBtStatus();
+            await getBtDevices();
             updateBT();
+          }
+          showOutCfg();
+          await getMpdStatus();
           updateMpd();
+          console.log(player);
         }
         catch (err) {
           alert(err.message);
@@ -456,24 +470,26 @@
       }
 
       const openBtDevMod = () => {
-        if (document.getElementById("btDevMod").style.visibility !== "visible") {
-          document.getElementById("btDevMod").style.visibility = "visible";
-          document.getElementById("btDevMod").style.opacity = 1;
-          periodicRefreshStatus(3000);
-          if (player.bt.Powered === 'yes') {
-            toutFetch('/bt/status/scan/on', 5000, {
-              method: 'POST'
-            })
-              // .then(() => refreshStatus())
-              .catch((err) => alert(err.message));
-          }
-        } else {
-          closeBtDevMod();
+        if (document.getElementById("btDevMod").style.visibility === "visible") return;
+        // if (document.getElementById("btDevMod").style.visibility !== "visible") {
+        document.getElementById("btDevMod").style.visibility = "visible";
+        document.getElementById("btDevMod").style.opacity = 1;
+        periodicRefreshStatus(3000);
+        if (player.bt.Powered === 'yes') {
+          toutFetch('/bt/status/scan/on', 5000, {
+            method: 'POST'
+          })
+            // .then(() => refreshStatus())
+            .catch((err) => alert(err.message));
         }
+        // } else {
+        //   closeBtDevMod();
+        // }
       }
 
       const closeBtDevMod = () => {
-        periodicRefreshStatus(30000);
+        if (document.getElementById("btDevMod").style.visibility === "hidden") return;
+        setTimeout(periodicRefreshStatus, 20000, 30000);
         document.getElementById("btDevMod").style.visibility = "hidden";
         document.getElementById("btDevMod").style.opacity = 0;
         if (player.bt.Powered === 'yes') {

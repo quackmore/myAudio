@@ -1,0 +1,20 @@
+{
+    "db": {
+        "database": "iot",
+        "host": "scellino",
+        "port": 5432,
+        "user": "archimede"
+    },
+    "httpd": {
+        "port": 3000
+    },
+    "player": {
+        "contactDevice": "192.168.1.185",
+        "contactRelay": 2,
+        "alsaCfg": "/home/flintheart/.asoundrc"
+    },
+    "logger": {
+        "console_log": "ON",
+        "log_path": "local-log"
+    }
+}

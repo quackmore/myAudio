@@ -1,6 +1,9 @@
 {
   "watch": [
     "*.*"
-    ],
+  ],
+  "ignore": [
+    "config/myAudio.json"
+  ],
   "ext": "css, html, js, json, mjs, ejs"
 }
