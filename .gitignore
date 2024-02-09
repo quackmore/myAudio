@@ -3,3 +3,4 @@ local-log/*
 TODO.txt
 *.old
 config/myAudio.json
+myAudio.json
