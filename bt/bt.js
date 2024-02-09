@@ -1,56 +1,36 @@
 const log = require('../logger')
+const mpd = require('../mpd')
 const cfg = require('config');
+const cfgfile = require('../cfgfile');
 const fs = require('fs');
-const path = require('path');
-const pkg = require('../package.json');
+
 const { spawn } = require("child_process");
-
-/*
-get power status
-get device info
-
-bluetoothctl power on
-bluetoothctl devices
-
-bluetoothctl scan on
-
-bluetoothctl agent on
-bluetoothctl pair/trust <MAC address>
-bluetoothctl connect <MAC address>
-
-bluetoothctl scan off
-
-autoconnect:
-- remember last connected device
-- using scan it's possible to see (info MAC address -> show RSSI property...) active devices
-
-*/
 
 var scan_status = {
   inProgress: false
 };
 
-const readCfgFile = (filename) => {
+const updateAlsaBtCfg = async (address) => {
+  let file_content = "";
   try {
-    file_content = fs.readFileSync(path.join(__dirname, `../config/${filename}`));
-    return JSON.parse(file_content);
+    file_content = fs.readFileSync(cfg.get('player.alsaCfgFile')).toString();
   } catch (err) {
     log.error(err.message)
-    return "{}";
+    return;
   }
-}
-
-const saveCfgFile = (filename, content) => {
+  if (file_content.includes(address)) return;
+  let fixedContent = file_content.substring(0, file_content.indexOf('# BLUETOOTH CUSTOM DEVICE\n'));
+  file_content = fixedContent + `# BLUETOOTH CUSTOM DEVICE\n\npcm.bth-speaker {\n    type plug\n    slave.pcm {\n        type bluealsa\n        device "${address}"\n        profile "a2dp"\n    }\n}`;
   try {
-    fs.writeFileSync(path.join(__dirname, `../config/${filename}`), JSON.stringify(content, null, 4));
+    fs.writeFileSync(cfg.get('player.alsaCfgFile'), file_content);
+    mpd.restart();
   } catch (err) {
     log.error(err.message)
   }
 }
-
 
 const saveVolume = (address, value) => {
-  let content = readCfgFile(`${pkg.name}.json`);
+  let content = cfgfile.read();
   if (!content.bt) content.bt = {};
   if (!content.bt.defaultVolume) content.bt.defaultVolume = [];
   let devFound = false;
@@ -61,11 +41,11 @@ const saveVolume = (address, value) => {
     }
   if (!devFound)
     content.bt.defaultVolume.push({ 'address': address, 'volume': value });
-  saveCfgFile(`${pkg.name}.json`, content);
+  cfgfile.save(content);
 }
 
 const saveVolumeInc = (address, value) => {
-  let content = readCfgFile(`${pkg.name}.json`);
+  let content = cfgfile.read();
   if (!content.bt) content.bt = {};
   if (!content.bt.defaultVolume) content.bt.defaultVolume = [];
   let devFound = false;
@@ -74,7 +54,7 @@ const saveVolumeInc = (address, value) => {
       devFound = true;
       dev.volume = `${parseInt(dev.volume.split('%')[0]) + value}%`;
     }
-  saveCfgFile(`${pkg.name}.json`, content);
+  cfgfile.save(content);
 }
 
 async function volumeSet(address, value) {
@@ -213,14 +193,15 @@ async function deviceConnect(address) {
     throw new Error(msg);
   }
 
+  updateAlsaBtCfg(address);
   // save last connected device
-  let content = readCfgFile(`${pkg.name}.json`);
+  let content = cfgfile.read();
   if (!content.bt) content.bt = {};
   if (!content.bt) content.bt = {};
   if (!content.bt.lastConnected) content.bt.lastConnected = "";
   if (content.bt.lastConnected !== address) {
     content.bt.lastConnected = address;
-    saveCfgFile(`${pkg.name}.json`, content);
+    cfgfile.save(content);
   }
   // set default volume
   if (content.bt.defaultVolume) {
@@ -469,7 +450,7 @@ module.exports = {
     // if no device connected
     // connect to last connected device if it's online
     if (!btConnected) {
-      let content = readCfgFile(`${pkg.name}.json`);
+      let content = cfgfile.read();
       if (!content.bt) content.bt = {};
       if (content.bt && content.bt.lastConnected) {
         for (dev of devices) {

@@ -1,10 +1,4 @@
 {
-    "db": {
-        "database": "iot",
-        "host": "localhost",
-        "port": 5432,
-        "user": "archimede"
-    },
     "httpd": {
         "port": 3040
     },
@@ -14,6 +8,7 @@
     },
     "player": {
         "contactDevice": "192.168.1.185",
-        "contactRelay": 2
+        "contactRelay": 2,
+        "alsaCfgFile": "/home/flintheart/.asoundrc"
     }
 }

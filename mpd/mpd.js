@@ -2,11 +2,7 @@ const mpd = require('mpd');
 const cmd = mpd.cmd;
 const { resolve } = require('path');
 const log = require('../logger');
-
-const client = mpd.connect({
-  port: 6600,
-  host: 'localhost',
-});
+const { spawn } = require("child_process");
 
 var mpdSt = {};
 
@@ -20,59 +16,160 @@ const parseMpd = (txt) => {
   return obj;
 }
 
-const updateStatus = () =>
-  new Promise((resolve, reject) => {
-    client.sendCommand(cmd("status", []), (err, msg) => {
+var client = null;
+
+const updateStatus = () => {
+  return new Promise((resolve, reject) => {
+    if (!mpdSt.online)
+      resolve(mpdSt);
+    else
+      client.sendCommand(cmd("status", []), (err, msg) => {
+        if (err) {
+          log.error(err);
+          reject(err);
+        } else {
+          mpdSt.status = parseMpd(msg);
+          client.sendCommand(cmd("currentsong", []), (err, msg) => {
+            if (err) {
+              log.error(err);
+              reject(err);
+            } else {
+              mpdSt.curSong = parseMpd(msg);
+              resolve(mpdSt);
+            }
+          });
+        }
+      });
+  });
+}
+
+const playCmd = (command, options) => {
+  return new Promise((resolve, reject) => {
+    if (!mpdSt.online) reject(new Error("mpd offline"));
+    client.sendCommand(cmd(command, options), (err, msg) => {
       if (err) {
-        log.error(err);
+        log.error(err.message);
         reject(err);
-      } else {
-        mpdSt.status = parseMpd(msg);
-        client.sendCommand(cmd("currentsong", []), (err, msg) => {
-          if (err) {
-            log.error(err);
-            reject(err);
-          } else {
-            mpdSt.curSong = parseMpd(msg);
-            resolve(mpdSt);
-          }
-        });
       }
+      resolve("done");
     });
+  })
+}
+
+let reconnectCount = 0;
+
+function connect() {
+  let reconnectInterval = null;
+
+  client = mpd.connect({
+    port: 6600,
+    host: 'localhost',
   });
 
-client.on('ready', () => {
-  log.info("connected to mpd");
-  updateStatus();
-});
+  client.on('ready', () => {
+    mpdSt.online = true;
+    clearInterval(reconnectInterval);
+    reconnectCount = 0;
+    log.info("connected to mpd");
+    updateStatus();
+  });
 
-client.on('error', (err) => {
-  log.error(err.message);
-});
+  client.on('end', () => {
+    mpdSt.online = false;
+    if (reconnectCount < 10) {
+      reconnectInterval = setTimeout(connect, 1000);
+      reconnectCount++;
+    } else
+      reconnectInterval = setTimeout(connect, 3000);
+    log.info("connection to mpd closed");
+  });
 
-client.on('system', (name) => {
-  log.info(`update ${name}`);
-});
+  client.on('error', (err) => {
+    log.error(err.message);
+  });
 
-client.on('system-player', () => {
-  updateStatus();
-});
+  client.on('system', (name) => {
+    log.info(`update ${name}`);
+  });
 
-const delay = (t, val) => new Promise(resolve => setTimeout(resolve, t, val));
+  client.on('system-player', () => {
+    updateStatus();
+  });
+}
+
+// connect();
+
+async function start() {
+  log.info("starting mpd...");
+  let mpdCmd = spawn("mpd", []);
+  data = "";
+  for await (const chunk of mpdCmd.stdout)
+    data += chunk;
+  error = "";
+  for await (const chunk of mpdCmd.stderr) {
+    error += chunk;
+  }
+  exitCode = await new Promise((resolve, reject) => {
+    mpdCmd.on('close', resolve);
+  });
+
+  if (exitCode) {
+    let msg = `mpd error: ${data} - ${error}`;
+    log.error(msg);
+    // throw new Error(msg);
+  } else
+    log.info("mpd started");
+  connect();
+}
+
+async function end() {
+  log.info("ending mpd...");
+  let mpdCmd = spawn("mpd", ["--kill"]);
+  data = "";
+  for await (const chunk of mpdCmd.stdout)
+    data += chunk;
+  error = "";
+  for await (const chunk of mpdCmd.stderr) {
+    error += chunk;
+  }
+  exitCode = await new Promise((resolve, reject) => {
+    mpdCmd.on('close', resolve);
+  });
+
+  if (exitCode) {
+    let msg = `mpd error: ${data} - ${error}`;
+    log.error(msg);
+    // throw new Error(msg);
+  } else
+    log.info("mpd ended");
+}
+
+async function restart() {
+  log.info("restarting mpd...");
+  let mpdCmd = spawn("mpd --kill && mpd", { shell: true });
+  data = "";
+  for await (const chunk of mpdCmd.stdout)
+    data += chunk;
+  error = "";
+  for await (const chunk of mpdCmd.stderr) {
+    error += chunk;
+  }
+  exitCode = await new Promise((resolve, reject) => {
+    mpdCmd.on('close', resolve);
+  });
+
+  if (exitCode) {
+    let msg = `mpd error: ${data} - ${error}`;
+    log.error(msg);
+    // throw new Error(msg);
+  } else
+    log.info("mpd restarted");
+}
 
 module.exports = {
-  status: () => {
-    return updateStatus();
-  },
-  playCmd: (command, options) => {
-    return new Promise((resolve, reject) => {
-      client.sendCommand(cmd(command, options), (err, msg) => {
-        if (err) {
-          log.error(err.message);
-          reject(err);
-        }
-        resolve("done");
-      });
-    })
-  }
+  status: updateStatus,
+  playCmd: playCmd,
+  start: start,
+  end: end,
+  restart: restart
 }

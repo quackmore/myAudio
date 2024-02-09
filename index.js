@@ -7,12 +7,14 @@ const packageJSON = require("./package.json");
 const mpd = require("./mpd");
 
 log.info(`${packageJSON.name} started`);
+mpd.start();
 
 // graceful shutdown
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
     httpd.closeAllConnections();
     httpd.close();
-    log.info(`${packageJSON.name} ended`)
-    log.end()
-    process.exit(0)
+    await mpd.end();
+    log.info(`${packageJSON.name} ended`);
+    log.end();
+    process.exit(0);
 })
