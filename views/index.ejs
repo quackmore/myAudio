@@ -12,60 +12,7 @@
     </div>
   </div>
   <!-- end of spinner -->
-  <!-- bluetooth device list modal -->
-  <div class="modalBox" id="btDevMod">
-    <div>
-      <div class="justify firstLine">
-        <span>Devices</span>
-        <div class="right">
-          <i onclick="closeBtDevMod()" class="fa-regular fa-xmark"></i>
-        </div>
-      </div>
-      <div id="btDevList" style="padding-top: 10px; padding-bottom: 20px;">
-        <div class="justify">
-          <span>Device 1</span>
-          <div class="right">
-            <i class="fa-regular fa-trash-can"></i>
-          </div>
-        </div>
-        <div class="justify">
-          <span>Device lunghissima</span>
-          <span>&emsp;&emsp;</span>
-          <div class="right">
-            <i class="fa-regular fa-trash-can"></i>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- end of bluetooth device list modal -->
   <!-- volume modal -->
-  <div class="modalBox" id="volumeMod">
-    <div>
-      <div class="justify firstLine">
-        <span class="left">Volume</span>
-        <div class="right">
-          <i onclick="closeVolumeMod()" class="fa-regular fa-xmark"></i>
-        </div>
-      </div>
-      <div class="justify" style="padding-top: 10px; padding-bottom: 20px;">
-        <div class=" left">
-          <span id="volMute" onclick="volumeToggleMute()">
-            <i class="fa-solid fa-volume-xmark"></i>
-            <!-- fa-volume-high -->
-          </span>
-          <i id="volMinus" class="fa-solid fa-minus" onclick="volumeDec()"></i>
-        </div>
-        <div class="volSlider">
-          <input type="range" min="1" max="100" value="0" class="slider" id="volRange" disabled onchange="volumeSet()">
-        </div>
-        <div class="right">
-          <i id="volPlus" class="fa-solid fa-plus" onclick="volumeInc()"></i>
-        </div>
-      </div>
-
-    </div>
-  </div>
   <!-- end of volume modal -->
   <div class="column fullHeight">
     <div class="firstLine center" style="border:1px solid blue;">
@@ -82,6 +29,23 @@
           <!-- <div class="right">
             <i id="outCfg" onclick="openBtDevMod()" class="fa-regular fa-gear"></i>
           </div> -->
+        </div>
+        <div id="btDevMod" style="display: none;">
+          <div id="btDevList" style="padding: 20px; background-color: lightblue;">
+            <div class="justify">
+              <span>Device 1</span>
+              <div class="right">
+                <i class="fa-regular fa-trash-can"></i>
+              </div>
+            </div>
+            <div class="justify">
+              <span>Device lunghissima</span>
+              <span>&emsp;&emsp;</span>
+              <div class="right">
+                <i class="fa-regular fa-trash-can"></i>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="center" style="padding: 10px;">
           <span id="song" style="font-size: small;">Author - Song description - Album</span>
@@ -112,6 +76,29 @@
             </div>
             <div class="right">
               <span id="volLevel" onclick="openVolumeMod()">0</span>
+            </div>
+          </div>
+        </div>
+        <div id="volumeMod" style="display: none;">
+          <div class="justify">
+            <div class="justify" style="padding: 20px; background-color: lightblue;">
+              <div class=" left">
+                <span id="volMute" onclick="volumeToggleMute()">
+                  <i class="fa-solid fa-volume-xmark"></i>
+                  <!-- fa-volume-high -->
+                </span>
+                <i id="volMinus" class="fa-solid fa-minus" onclick="volumeDec()"></i>
+              </div>
+              <div class="volSlider">
+                <input type="range" min="1" max="100" value="0" class="slider" id="volRange" disabled
+                  onchange="volumeSet()">
+              </div>
+              <div class="right">
+                <i id="volPlus" class="fa-solid fa-plus" onclick="volumeInc()"></i>
+              </div>
+              <div class="right">
+                <i onclick="closeVolumeMod()" class="fa-regular fa-xmark"></i>
+              </div>
             </div>
           </div>
         </div>
@@ -471,10 +458,8 @@
       }
 
       const openBtDevMod = () => {
-        if (document.getElementById("btDevMod").style.visibility === "visible") return;
-        // if (document.getElementById("btDevMod").style.visibility !== "visible") {
-        document.getElementById("btDevMod").style.visibility = "visible";
-        document.getElementById("btDevMod").style.opacity = 1;
+        if (document.getElementById("btDevMod").style.display === "block") return;
+        document.getElementById("btDevMod").style.display = "block";
         periodicRefreshStatus(3000);
         if (player.bt.Powered === 'yes') {
           toutFetch('/bt/status/scan/on', 5000, {
@@ -483,16 +468,12 @@
             // .then(() => refreshStatus())
             .catch((err) => alert(err.message));
         }
-        // } else {
-        //   closeBtDevMod();
-        // }
       }
 
       const closeBtDevMod = () => {
-        if (document.getElementById("btDevMod").style.visibility === "hidden") return;
+        if (document.getElementById("btDevMod").style.display === "none") return;
         setTimeout(periodicRefreshStatus, 20000, 30000);
-        document.getElementById("btDevMod").style.visibility = "hidden";
-        document.getElementById("btDevMod").style.opacity = 0;
+        document.getElementById("btDevMod").style.display = "none";
         if (player.bt.Powered === 'yes') {
           toutFetch('/bt/status/scan/off', 5000, {
             method: 'POST',
@@ -504,17 +485,15 @@
       }
 
       const openVolumeMod = () => {
-        if (document.getElementById("volumeMod").style.visibility !== "visible") {
-          document.getElementById("volumeMod").style.visibility = "visible";
-          document.getElementById("volumeMod").style.opacity = 1;
+        if (document.getElementById("volumeMod").style.display !== "block") {
+          document.getElementById("volumeMod").style.display = "block";
         } else {
           closeVolumeMod();
         }
       }
 
       const closeVolumeMod = () => {
-        document.getElementById("volumeMod").style.visibility = "hidden";
-        document.getElementById("volumeMod").style.opacity = 0;
+        document.getElementById("volumeMod").style.display = "none";
       }
 
       let updateElapsed = null;
