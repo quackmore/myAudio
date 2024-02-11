@@ -11,7 +11,14 @@ module.exports = {
       return JSON.parse(file_content);
     } catch (err) {
       log.error(err.message)
-      return "{}";
+      if (err.code === 'ENOENT') {
+        try {
+          fs.writeFileSync(path.join(__dirname, `../config/${pkg.name}.json`), JSON.stringify({}, null, 4));
+        } catch (err) {
+          log.error(err.message)
+        }
+      }
+      return {};
     }
   },
   save: (content) => {

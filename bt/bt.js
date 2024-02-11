@@ -197,7 +197,6 @@ async function deviceConnect(address) {
   // save last connected device
   let content = cfgfile.read();
   if (!content.bt) content.bt = {};
-  if (!content.bt) content.bt = {};
   if (!content.bt.lastConnected) content.bt.lastConnected = "";
   if (content.bt.lastConnected !== address) {
     content.bt.lastConnected = address;
@@ -209,7 +208,6 @@ async function deviceConnect(address) {
       if (dev.address === address)
         setTimeout(autoSetVolume, 1000, address, dev.volume);
   }
-
   return data;
 }
 
@@ -451,8 +449,7 @@ module.exports = {
     // connect to last connected device if it's online
     if (!btConnected) {
       let content = cfgfile.read();
-      if (!content.bt) content.bt = {};
-      if (content.bt && content.bt.lastConnected) {
+      if (content != {} && content.bt && content.bt.lastConnected) {
         for (dev of devices) {
           if (dev.address === content.bt.lastConnected && dev.online === 'yes') {
             setTimeout(autoconnect, 500, content.bt.lastConnected);
