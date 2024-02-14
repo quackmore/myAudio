@@ -1,19 +1,36 @@
 body {
     font-family: "Lato", sans-serif;
     font-size: 14pt;
-    display: flex;
-    width: 98%;
-    justify-content: center;
-    /* background-color: rgb(39, 34, 34); */
-}
-
-.column {
+    width: 95vw;
+    height: 97vh;
     display: flex;
     flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    margin: 0;
+    padding: 10px;
 }
 
-.fullHeight {
-    height: 100dvh;
+.upBox {
+    flex: 0 0 auto;
+    border: 1px solid blue;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0px;
+    margin-bottom: 1px;
+}
+
+.lowBox {
+    flex: 1 0 auto;
+    border: 1px solid blue;
+    width: 100%;
+    height: max-content;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: start;
 }
 
 .fixedWidth {
@@ -49,13 +66,8 @@ body {
     justify-content: center;
     align-items: center;
     gap: 30px;
-    height: fit-content;
 }
 
-.firstLine {
-    padding-top: 10px;
-    padding-bottom: 10px;
-}
 
 .myselect {
     border-style: none;
@@ -82,20 +94,50 @@ body {
     width: 100%;
 }
 
+.noGrowNoShrink {
+    flex: 0 0 auto;
+}
 
-.modalBox {
-    position: absolute;
-    margin: 10px;
-    margin-top: 30%;
-    padding: 10px;
+.tabrow {
+    text-align: left;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    line-height: 24px;
+    z-index: 1;
+}
+
+.tabrow li {
+    margin: 0 -5px;
+    padding: 0 10px;
+    border: 1px solid #1b3252;
+    display: inline-block;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    background: #1b3252;
+    color: #ffffff;
+}
+
+.tabrow li:first-of-type {
+    margin-left: 0;
+}
+
+.tabrow li.selected {
+    background: white;
+    border-bottom: 1px solid white;
+    color: #1b3252;
+}
+
+.tabContent {
+    flex: 1 1 0;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    visibility: hidden;
-    opacity: 0;
-    background-color: lightgrey;
-    border: 1px solid;
-    box-shadow: 5px 10px;
+    height: 100%;
+    width: 100%;
+    overflow: auto;
+    border-top: 1px solid #1b3252;
+    border-bottom: 1px solid #1b3252;
+    margin-top: -1px;
+    font-size: small;
 }
 
 /* spinner for fetch loading */

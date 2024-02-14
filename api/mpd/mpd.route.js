@@ -24,4 +24,13 @@ router.post('/cmd/:cmd/:opt1?/:opt2?/:opt3?', async function (req, res, next) {
   }
 });
 
+router.get('/listinfo/:info/:uri?', async function (req, res, next) {
+  if (!req.params.info) return res.status(400).send("no command");
+  let options = [];
+  if (req.params.uri) options.push(req.params.uri);
+  mpd.listinfo(req.params.info, options)
+    .then(data => res.json(data))
+    .catch(err => res.status(500).send(err.message));
+});
+
 module.exports = router;

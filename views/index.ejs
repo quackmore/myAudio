@@ -6,114 +6,119 @@
 </head>
 
 <body>
-  <!-- spinner -->
   <div id="spinnerMod" class="overlay">
     <div class="spinner">
     </div>
   </div>
-  <!-- end of spinner -->
-  <!-- volume modal -->
-  <!-- end of volume modal -->
-  <div class="column fullHeight">
-    <div class="firstLine center" style="border:1px solid blue;">
-      <div class="column fixedWidth">
-        <div class="justify">
+
+  <div class="upBox">
+    <div class="fixedWidth">
+      <div class="justify">
+        <div class="left">
+          <select class="myselect" name="audioSel" id="outSel" onchange="refreshStatus()">
+            <option value="bt">Bluetooth</option>
+            <option value="spkrs">Speakers</option>
+          </select>
+          <div id="outSwitch" onclick="outSwitch()"></div>
+          <div class="left" id="btDevDesc" style="font-size: small"></div>
+        </div>
+      </div>
+      <div id="btDevMod" style="display: none;">
+        <div id="btDevList" style="padding: 20px; background-color: lightblue;">
+          <div class="justify">
+            <span>Device 1</span>
+            <div class="right">
+              <i class="fa-regular fa-trash-can"></i>
+            </div>
+          </div>
+          <div class="justify">
+            <span>Device lunghissima</span>
+            <span>&emsp;&emsp;</span>
+            <div class="right">
+              <i class="fa-regular fa-trash-can"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="center" style="padding: 10px;">
+        <span id="song" style="font-size: small;">Author - Song description - Album</span>
+      </div>
+      <div class="center" style="gap: 10px;">
+        <div class="left" style="width: 60%;">
+          <input type="range" min="1" max="100" value="0" class="slider" id="elapsed" onchange="setPosition(this.value)"
+            onmousedown="setUpdateElapsed(0);" onmouseup="setUpdateElapsed(1000);">
+        </div>
+        <span class="right" style="font-size: small;" id="duration">00:00 - 00:00</span>
+      </div>
+      <div class="justify" style="padding-top: 10px;">
+        <div class="justify" style="padding-left: 40px; padding-right: 40px;">
+          <i class="fa-solid fa-shuffle fa-xs" style="color: lightgray;" id="shuffle" onclick="toggleShuffle()"></i>
+          <i class="fa-solid fa-backward-step fa-sm" id="previous" onclick="mpdCmd('previous',[])"></i>
+          <i class="fa-solid fa-pause fa-xl" id="play" onclick="togglePlay()"></i>
+          <i class="fa-solid fa-forward-step fa-sm" id="next" onclick="mpdCmd('next',[])"></i>
+          <i class="fa-solid fa-repeat fa-xs" style="color: lightgray;" id="repeat" onclick="toggleRepeat()"></i>
+          <i class="fa-solid fa-1 fa-xs" style="color: lightgray;" id="single" onclick="toggleSingle()"></i>
+        </div>
+        <div class="right" style="padding-right: 20px;">
           <div class="left">
-            <select class="myselect" name="audioSel" id="outSel" onchange="refreshStatus()">
-              <option value="bt">Bluetooth</option>
-              <option value="spkrs">Speakers</option>
-            </select>
-            <div id="outSwitch" onclick="outSwitch()"></div>
-            <div class="left" id="btDevDesc" style="font-size: small"></div>
+            <span id="volMute2" onclick="volumeToggleMute()">
+              <i class="fa-solid fa-volume-xmark"></i>
+            </span>
           </div>
-          <!-- <div class="right">
-            <i id="outCfg" onclick="openBtDevMod()" class="fa-regular fa-gear"></i>
-          </div> -->
-        </div>
-        <div id="btDevMod" style="display: none;">
-          <div id="btDevList" style="padding: 20px; background-color: lightblue;">
-            <div class="justify">
-              <span>Device 1</span>
-              <div class="right">
-                <i class="fa-regular fa-trash-can"></i>
-              </div>
-            </div>
-            <div class="justify">
-              <span>Device lunghissima</span>
-              <span>&emsp;&emsp;</span>
-              <div class="right">
-                <i class="fa-regular fa-trash-can"></i>
-              </div>
-            </div>
+          <div class="right">
+            <span id="volLevel" onclick="openVolumeMod()">0</span>
           </div>
         </div>
-        <div class="center" style="padding: 10px;">
-          <span id="song" style="font-size: small;">Author - Song description - Album</span>
-        </div>
-        <div class="center" style="gap: 10px;">
-          <div class="left" style="width: 60%;">
-            <input type="range" min="1" max="100" value="0" class="slider" id="elapsed"
-              onchange="setPosition(this.value)" onmousedown="setUpdateElapsed(0);" onmouseup="setUpdateElapsed(1000);">
-          </div>
-          <span class="right" style="font-size: small;" id="duration">00:00 - 00:00</span>
-        </div>
-        <div class="justify" style="padding-top: 10px;">
-          <div class="justify" style="padding-left: 40px; padding-right: 40px;">
-            <i class="fa-solid fa-shuffle fa-xs" style="color: lightgray;" id="shuffle" onclick="toggleShuffle()"></i>
-            <i class="fa-solid fa-backward-step fa-sm" id="previous" onclick="mpdCmd('previous',[])"></i>
-            <!-- <i class="fa-solid fa-play fa-xl"></i> -->
-            <i class="fa-solid fa-pause fa-xl" id="play" onclick="togglePlay()"></i>
-            <i class="fa-solid fa-forward-step fa-sm" id="next" onclick="mpdCmd('next',[])"></i>
-            <i class="fa-solid fa-repeat fa-xs" style="color: lightgray;" id="repeat" onclick="toggleRepeat()"></i>
-            <i class="fa-solid fa-1 fa-xs" style="color: lightgray;" id="single" onclick="toggleSingle()"></i>
-          </div>
-          <div class="right" style="padding-right: 20px;">
-            <div class="left">
-              <span id="volMute2" onclick="volumeToggleMute()">
+      </div>
+      <div id="volumeMod" style="display: none; margin-top: 10px;">
+        <div class="justify">
+          <div class="justify" style="padding: 20px; background-color: lightblue;">
+            <div class=" left">
+              <span id="volMute" onclick="volumeToggleMute()">
                 <i class="fa-solid fa-volume-xmark"></i>
-                <!-- fa-volume-high -->
               </span>
+              <i id="volMinus" class="fa-solid fa-minus" onclick="volumeDec()"></i>
+            </div>
+            <div class="volSlider">
+              <input type="range" min="1" max="100" value="0" class="slider" id="volRange" disabled
+                onchange="volumeSet()" oninput="showVolume()">
             </div>
             <div class="right">
-              <span id="volLevel" onclick="openVolumeMod()">0</span>
+              <i id="volPlus" class="fa-solid fa-plus" onclick="volumeInc()"></i>
             </div>
-          </div>
-        </div>
-        <div id="volumeMod" style="display: none;">
-          <div class="justify">
-            <div class="justify" style="padding: 20px; background-color: lightblue;">
-              <div class=" left">
-                <span id="volMute" onclick="volumeToggleMute()">
-                  <i class="fa-solid fa-volume-xmark"></i>
-                  <!-- fa-volume-high -->
-                </span>
-                <i id="volMinus" class="fa-solid fa-minus" onclick="volumeDec()"></i>
-              </div>
-              <div class="volSlider">
-                <input type="range" min="1" max="100" value="0" class="slider" id="volRange" disabled
-                  onchange="volumeSet()" oninput="showVolume()">
-              </div>
-              <div class="right">
-                <i id="volPlus" class="fa-solid fa-plus" onclick="volumeInc()"></i>
-              </div>
-              <div class="right">
-                <i onclick="closeVolumeMod()" class="fa-regular fa-xmark"></i>
-              </div>
+            <div class="right">
+              <i onclick="closeVolumeMod()" class="fa-regular fa-xmark"></i>
             </div>
           </div>
         </div>
       </div>
     </div>
-
-    <div style="border:1px solid blue; margin-top: 2px; margin-bottom: 20px; flex-grow: 1;">
+  </div>
+  <div class="lowBox">
+    <ul class="noGrowNoShrink tabrow">
+      <li onclick="loadQueue()" id="queueTab">Queue</li>
+      <li onclick="listPlaylists()" id="playlistsTab">Playlists</li>
+      <li onclick="loadFiles()" id="filesTab">Files</li>
+      <li onclick="loadRadio()" id="radioTab">Radio</li>
+    </ul>
+    <div class="tabContent" id="tabCt">
     </div>
+    <div class="noGrowNoShrink" style="height: 50px;">
+      comandi
+    </div>
+
   </div>
 
   <!-- SCRIPTS-->
   <%- include('./partials/_helpers'); %>
 
     <script>
+
       var player = {};
+      var queue = {};
+      var playlists = {};
+      var files = {};
+      var selectedTab = null;
 
       const mpdCmd = (cmd, options) => {
         let req = {
@@ -122,7 +127,7 @@
         url = `/mpd/cmd/${cmd}`;
         for (opt of options)
           url += `/${opt}`;
-        toutFetch(url, 5000, req)
+        return toutFetch(url, 5000, req)
           .then(res => res.json())
           .then(data => refreshStatus())
           .catch(err => alert(err.message));
@@ -152,7 +157,7 @@
           .then(data => player.mpd = data)
       }
 
-      const showOutCfg = () => {
+      const showBtDevices = () => {
         if (document.getElementById('outSel').value === 'spkrs') {
           // document.getElementById("outCfg").style.visibility = "hidden";
           // document.getElementById("outCfg").style.opacity = 0;
@@ -379,7 +384,7 @@
             await getBtDevices();
             updateBT();
           }
-          showOutCfg();
+          showBtDevices();
           await getMpdStatus();
           updateMpd();
           // DEBUG
@@ -517,6 +522,74 @@
         refreshInterval = setInterval(refreshStatus, val);
       }
 
+      // CONTENT TAB
+
+      function selectTab(tab) {
+        if (selectedTab) selectedTab.classList.remove("selected");
+        selectedTab = document.getElementById(tab);
+        selectedTab.classList.add("selected");
+      }
+      const loadQueue = async () => {
+        selectTab("queueTab");
+        document.getElementById("tabCt").innerHTML = "loading...";
+        toutFetch(`/mpd/listinfo/playlistinfo`, 5000)
+          .then(data => data.json())
+          .then(data => {
+            queue = data;
+            if (queue.length) {
+              let pl_content = "<ul>";
+              for (item of queue)
+                pl_content += `<li>${item.Artist} - ${item.Title} - ${item.Album}</li>`;
+              pl_content += "<ul>";
+              document.getElementById("tabCt").innerHTML = pl_content;
+            } else
+              document.getElementById("tabCt").innerHTML = "Empty.";
+          })
+          .catch(err => alert(err.message));
+      }
+
+      const listPlaylists = async () => {
+        selectTab("playlistsTab");
+        document.getElementById("tabCt").innerHTML = "loading...";
+        toutFetch(`/mpd/listinfo/listplaylists`, 5000)
+          .then(data => data.json())
+          .then(data => {
+            playlists = data;
+            if (playlists.length) {
+              let pl_content = "<ul>";
+              for (item of playlists)
+                pl_content += `<li>${item.playlist}</li>`;
+              pl_content += "<ul>";
+              document.getElementById("tabCt").innerHTML = pl_content;
+            } else
+              document.getElementById("tabCt").innerHTML = "Empty.";
+          })
+          .catch(err => alert(err.message));
+      }
+
+      const loadFiles = async () => {
+        selectTab("filesTab");
+        document.getElementById("tabCt").innerHTML = "loading...";
+        toutFetch(`/mpd/listinfo/listfiles`, 5000)
+          .then(data => data.json())
+          .then((data) => {
+            files = data;
+            if (files.length) {
+              let pl_content = "<ul>";
+              for (item of files) {
+                if (item.directory)
+                  pl_content += `<li>directory: ${item.directory}</li>`;
+                if (item.file)
+                  pl_content += `<li>file: ${item.file}</li>`;
+              }
+              pl_content += "<ul>";
+              document.getElementById("tabCt").innerHTML = pl_content;
+            } else
+              document.getElementById("tabCt").innerHTML = "Empty.";
+          })
+          .catch(err => alert(err.message));
+      }
+
       // STARTUP
       let inPrefs = JSON.parse(`<%-JSON.stringify(prefs)%>`);
       player.speakers = {};
@@ -525,6 +598,8 @@
       let firstTime = true;
 
       refreshStatus();
+      loadQueue();
+
       periodicRefreshStatus(30000);
     </script>
 

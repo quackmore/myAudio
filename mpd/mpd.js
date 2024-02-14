@@ -6,7 +6,7 @@ const { spawn } = require("child_process");
 
 var mpdSt = {};
 
-const parseMpd = (txt) => {
+function parseObj(txt) {
   let obj = {};
   for (item of txt.split('\n'))
     if (item !== '') {
@@ -14,6 +14,23 @@ const parseMpd = (txt) => {
       obj[key.replace(/[ -]/g, '')] = val.toString().trimStart();
     }
   return obj;
+}
+
+function parseArrayOfObj(txt) {
+  let array = [];
+  let song = {};
+  for (item of txt.split('\n')) {
+    if (item === '') continue;
+    if ((item.startsWith('file') || item.startsWith('directory') || item.startsWith('playlist')) && Object.keys(song).length !== 0) {
+      array.push(song);
+      song = {};
+    }
+    let [key, ...val] = item.split(':');
+    song[key.replace(/[ -]/g, '')] = val.toString().trimStart();
+  }
+  if (Object.keys(song).length !== 0)
+    array.push(song);
+  return array;
 }
 
 var client = null;
@@ -28,13 +45,13 @@ const updateStatus = () => {
           log.error(err);
           reject(err);
         } else {
-          mpdSt.status = parseMpd(msg);
+          mpdSt.status = parseObj(msg);
           client.sendCommand(cmd("currentsong", []), (err, msg) => {
             if (err) {
               log.error(err);
               reject(err);
             } else {
-              mpdSt.curSong = parseMpd(msg);
+              mpdSt.curSong = parseObj(msg);
               resolve(mpdSt);
             }
           });
@@ -51,9 +68,15 @@ const playCmd = (command, options) => {
         log.error(err.message);
         reject(err);
       }
-      resolve("done");
+      resolve(msg);
     });
   })
+}
+
+const listinfo = (info, options) => {
+  return playCmd(info, options)
+    .then(data => parseArrayOfObj(data))
+    .catch(err => { throw new Error(err.message) });
 }
 
 let reconnectCount = 0;
@@ -169,6 +192,7 @@ async function restart() {
 module.exports = {
   status: updateStatus,
   playCmd: playCmd,
+  listinfo: listinfo,
   start: start,
   end: end,
   restart: restart
