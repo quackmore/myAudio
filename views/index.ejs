@@ -539,7 +539,7 @@
             if (queue.length) {
               let pl_content = "<ul>";
               for (item of queue)
-                pl_content += `<li>${item.Artist} - ${item.Title} - ${item.Album}</li>`;
+                pl_content += `<li>${item.Artist} - ${item.Album} - ${item.Title}</li>`;
               pl_content += "<ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
             } else
