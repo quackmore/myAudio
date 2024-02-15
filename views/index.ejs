@@ -537,10 +537,10 @@
           .then(data => {
             queue = data;
             if (queue.length) {
-              let pl_content = "<ul>";
+              let pl_content = '<ul class="tabCntLine">';
               for (item of queue)
                 pl_content += `<li>${item.Artist} - ${item.Album} - ${item.Title}</li>`;
-              pl_content += "<ul>";
+              pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
             } else
               document.getElementById("tabCt").innerHTML = "Empty.";
@@ -556,10 +556,10 @@
           .then(data => {
             playlists = data;
             if (playlists.length) {
-              let pl_content = "<ul>";
+              let pl_content = '<ul class="tabCntLine">';
               for (item of playlists)
                 pl_content += `<li>${item.playlist}</li>`;
-              pl_content += "<ul>";
+              pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
             } else
               document.getElementById("tabCt").innerHTML = "Empty.";
@@ -575,14 +575,14 @@
           .then((data) => {
             files = data;
             if (files.length) {
-              let pl_content = "<ul>";
+              let pl_content = '<ul class="tabCntLine">';
               for (item of files) {
                 if (item.directory)
                   pl_content += `<li>directory: ${item.directory}</li>`;
                 if (item.file)
                   pl_content += `<li>file: ${item.file}</li>`;
               }
-              pl_content += "<ul>";
+              pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
             } else
               document.getElementById("tabCt").innerHTML = "Empty.";
