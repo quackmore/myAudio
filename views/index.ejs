@@ -15,11 +15,11 @@
     <div class="fixedWidth">
       <div class="justify">
         <div class="left">
-          <select class="myselect" name="audioSel" id="outSel" onchange="refreshStatus()">
+          <select class="myselect" name="audioSel" id="outSel" onchange="refreshPlayerStatus()">
             <option value="bt">Bluetooth</option>
             <option value="spkrs">Speakers</option>
           </select>
-          <div id="outSwitch" onclick="outSwitch()"></div>
+          <div id="outputSelect" onclick="outputSelect()"></div>
           <div class="left" id="btDevDesc" style="font-size: small"></div>
         </div>
       </div>
@@ -99,7 +99,8 @@
       <li onclick="loadQueue()" id="queueTab">Queue</li>
       <li onclick="listPlaylists()" id="playlistsTab">Playlists</li>
       <li onclick="loadFiles()" id="filesTab">Files</li>
-      <li onclick="loadRadio()" id="radioTab">Radio</li>
+      <li onclick="loadRadio()" id="radioTab">Radios</li>
+      <li onclick="loadRadio()" id="radioTab">Podcasts</li>
     </ul>
     <div class="tabContent" id="tabCt">
     </div>
@@ -114,68 +115,13 @@
 
     <script>
 
+      let inPrefs = JSON.parse(`<%-JSON.stringify(prefs)%>`);
+
+      // PLAYER
+
       var player = {};
-      var queue = {};
-      var playlists = {};
-      var files = {};
-      var selectedTab = null;
 
-      const mpdCmd = (cmd, options) => {
-        let req = {
-          method: 'POST'
-        };
-        url = `/mpd/cmd/${cmd}`;
-        for (opt of options)
-          url += `/${opt}`;
-        return toutFetch(url, 5000, req)
-          .then(res => res.json())
-          .then(data => refreshStatus())
-          .catch(err => alert(err.message));
-      }
-
-      const getSpeakerStatus = () => {
-        return toutFetch(`http://${player.speakers.contactDevice}/auxContactsStatus`, 5000)
-          .then(res => res.json())
-          .then(data => player.speakers.speakerOn = (data.aux_contacts_status[player.speakers.contactRelay] === 'closed' ? 'on' : 'off'))
-      }
-
-      const getBtStatus = () => {
-        return toutFetch(`/bt/status`, 5000)
-          .then(res => res.json())
-          .then(data => player.bt = data)
-      }
-
-      const getBtDevices = () => {
-        return toutFetch(`/bt/devices`, 5000)
-          .then(res => res.json())
-          .then(data => player.bt.devices = data)
-      }
-
-      const getMpdStatus = () => {
-        return toutFetch(`/mpd/status`, 5000)
-          .then(res => res.json())
-          .then(data => player.mpd = data)
-      }
-
-      const showBtDevices = () => {
-        if (document.getElementById('outSel').value === 'spkrs') {
-          // document.getElementById("outCfg").style.visibility = "hidden";
-          // document.getElementById("outCfg").style.opacity = 0;
-          closeBtDevMod();
-        }
-        else {
-          // if (player.bt.Powered === 'yes') {
-          //   document.getElementById("outCfg").style.visibility = "visible";
-          //   document.getElementById("outCfg").style.opacity = 1;
-          // } else {
-          //   document.getElementById("outCfg").style.visibility = "hidden";
-          //   document.getElementById("outCfg").style.opacity = 0;
-          // }
-          if (player.bt.Powered !== 'yes') closeBtDevMod();
-        }
-      }
-
-      const outSwitch = async () => {
+      const outputSelect = async () => {
         let req = "";
         let url = ""
         if (document.getElementById('outSel').value === 'spkrs') {
@@ -194,43 +140,66 @@
         }
         try {
           await toutFetch(url, 5000, req);
-          refreshStatus();
+          refreshPlayerStatus();
         }
         catch (err) {
           alert(err.message);
         }
       }
 
-      const connectDev = async (idx) => {
-        loadSpinner();
-        toutFetch(`/bt/device/connect/${player.bt.devices[idx].address}`, 60000, {
-          method: 'POST'
-        })
-          .then(() => {
-            // closeBtDevMod();
-            refreshStatus();
-          })
-          .catch((err) => alert(`Failed to connect to ${player.bt.devices[idx].name}: ${err.message}`))
-          .finally(() => unloadSpinner());
+      let firstTime = true;
+
+      const refreshPlayerStatus = async () => {
+        try {
+          if (firstTime) {
+            await getSpeakerStatus();
+            await getBtStatus();
+            await getBtDevices();
+            await getMpdStatus();
+            document.getElementById('outSel').value = 'spkrs';
+            if (player.bt.Powered === 'yes') document.getElementById('outSel').value = 'bt';
+            firstTime = false;
+          }
+          if (document.getElementById('outSel').value === 'spkrs') {
+            await getSpeakerStatus();
+            updateSpeakers();
+          } else {
+            await getBtStatus();
+            await getBtDevices();
+            updateBT();
+          }
+          showBtDevices();
+          await getMpdStatus();
+          updateMpdPlayer();
+          // DEBUG
+          console.log(player);
+        }
+        catch (err) {
+          alert(err.message);
+        }
       }
 
-      const deleteDev = async (idx) => {
-        toutFetch(`/bt/device/remove/${player.bt.devices[idx].address}`, 60000, {
-          method: 'POST'
-        })
-          .then(() => refreshStatus())
-          .catch((err) => alert(`Failed to remove ${player.bt.devices[idx].name}: ${err.message}`));
+      let refreshInterval = null;
+      const periodicRefreshStatus = (val) => {
+        clearInterval(refreshInterval);
+        refreshInterval = setInterval(refreshPlayerStatus, val);
       }
 
-      const devOnline = (idx) => {
-        if (player.bt.devices[idx].online)
-          return player.bt.devices[idx].online === "yes" ? "[online]" : "";
-        return "";
+      // SPEAKERS
+
+      player.speakers = {};
+      player.speakers.contactDevice = inPrefs.audioContactDev;
+      player.speakers.contactRelay = +inPrefs.audioContactRel;
+
+      const getSpeakerStatus = () => {
+        return toutFetch(`http://${player.speakers.contactDevice}/auxContactsStatus`, 5000)
+          .then(res => res.json())
+          .then(data => player.speakers.speakerOn = (data.aux_contacts_status[player.speakers.contactRelay] === 'closed' ? 'on' : 'off'))
       }
 
       const updateSpeakers = () => {
         if (!player.speakers) return;
-        document.getElementById('outSwitch').innerHTML = (player.speakers.speakerOn === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
+        document.getElementById('outputSelect').innerHTML = (player.speakers.speakerOn === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
         document.getElementById('btDevDesc').innerHTML = "";
         document.getElementById('volRange').value = 0;
         document.getElementById('volRange').disabled = true;
@@ -238,73 +207,26 @@
         document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
       }
 
+      // MPD PLAYER
 
-      const updateBT = () => {
-        if (!player.bt) return;
-        document.getElementById('outSwitch').innerHTML = (player.bt.Powered === 'yes' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
-        let btDevList = document.getElementById('btDevList');
-        btDevList.innerHTML = "";
-        let connectedDev = -1;
-        for (let [idx, dev] of player.bt.devices.entries()) {
-          if (dev.connected === 'yes') connectedDev = idx;
-          btDevList.innerHTML += `<div class="justify"><span onclick="connectDev(${idx})">${dev.name}</span><span>&emsp;&emsp;</span><span class="right">${devOnline(idx)}</span><span class="right"><i class="fa-regular fa-trash-can" onclick="deleteDev(${idx})"></i></span>`;
-        }
-        if (connectedDev >= 0) {
-          closeBtDevMod();
-          document.getElementById('btDevDesc').innerHTML = `<span>${player.bt.devices[connectedDev].name}</span><i class="fa-regular fa-battery-three-quarters"></i><span>${player.bt.devices[connectedDev].battery ? player.bt.devices[connectedDev].battery : ""}</span>`;
-          if (player.bt.devices[connectedDev].volume) {
-            document.getElementById('volRange').value = player.bt.devices[connectedDev].volume.split("%")[0];
-            document.getElementById('volLevel').innerText = player.bt.devices[connectedDev].volume.split("%")[0];
-            document.getElementById('volRange').disabled = false;
-          }
-          if (player.bt.devices[connectedDev].mute) {
-            document.getElementById('volMute').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark"></i>' : '<i class="fa-solid fa-volume-high"></i>';
-            document.getElementById('volMute2').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark"></i>' : '<i class="fa-solid fa-volume-high"></i>';
-          }
-        }
-        else {
-          if (player.bt.Powered === 'yes') openBtDevMod();
-          document.getElementById('btDevDesc').innerHTML = "";
-          document.getElementById('volRange').value = 0;
-          document.getElementById('volRange').disabled = true;
-          document.getElementById('volLevel').innerText = 0;
-          document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
-          document.getElementById('volMute2').innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
-        }
+      const mpdCmd = (cmd, options) => {
+        let req = {
+          method: 'POST'
+        };
+        url = `/mpd/cmd/${cmd}`;
+        for (opt of options)
+          url += `/${opt}`;
+        return toutFetch(url, 5000, req)
+          .then(res => res.json())
+          .then(() => refreshPlayerStatus())
+          .then(() => refreshQueue())
+          .catch(err => alert(err.message));
       }
 
-      const updateMpd = () => {
-        if (!player.mpd) return;
-        if (player.mpd.curSong) {
-          let desc = `${player.mpd.curSong.Artist} - ${player.mpd.curSong.Title} [${player.mpd.curSong.Album}]`;
-          if (desc.length > 58)
-            desc = `<center>${player.mpd.curSong.Artist}</center>\n<center>${player.mpd.curSong.Title}</center>\n<center>[${player.mpd.curSong.Album}]</center>`;
-          document.getElementById('song').innerHTML = desc;
-        }
-        if (player.mpd.status) {
-          if (player.mpd.status.error) alert(player.mpd.status.error);
-          document.getElementById('elapsed').value = 100 * parseFloat(player.mpd.status.elapsed) / parseFloat(player.mpd.status.duration);
-          if (player.mpd.status.random === '1')
-            document.getElementById('shuffle').style.color = null;
-          else
-            document.getElementById('shuffle').style.color = 'lightgray';
-          if (player.mpd.status.repeat === '1')
-            document.getElementById('repeat').style.color = null;
-          else
-            document.getElementById('repeat').style.color = 'lightgray';
-          if (player.mpd.status.single === '1')
-            document.getElementById('single').style.color = null;
-          else
-            document.getElementById('single').style.color = 'lightgray';
-          if (player.mpd.status.state === 'play') {
-            document.getElementById('play').className = "fa-solid fa-pause fa-xl";
-            refreshElapsed();
-            setUpdateElapsed(1000);
-          } else {
-            document.getElementById('play').className = "fa-solid fa-play fa-xl";
-            setUpdateElapsed(0);
-          }
-        }
+      const getMpdStatus = () => {
+        return toutFetch(`/mpd/status`, 5000)
+          .then(res => res.json())
+          .then(data => player.mpd = data)
       }
 
       const setPosition = async (perc) => {
@@ -314,7 +236,7 @@
         setUpdateElapsed(1000);
       }
 
-      const refreshElapsed = () => {
+      const refreshElapsed = async () => {
         if (!player.mpd || !player.mpd.status) return;
         let elapsed = parseFloat(player.mpd.status.elapsed) + 1.0;
         let duration = parseFloat(player.mpd.status.duration);
@@ -325,12 +247,20 @@
         let dm = Math.trunc((duration % 3600) / 60);
         let ds = Math.trunc((duration % 3600) % 60);
         document.getElementById('duration').innerText = `${eh > 0 ? eh + ":" : ""}${String(em).padStart(2, '0')}:${String(es).padStart(2, '0')} - ${dh > 0 ? dh + ":" : ""}${String(dm).padStart(2, '0')}:${String(ds).padStart(2, '0')}`;
-        if (elapsed >= duration)
-          refreshStatus();
-        else {
+        if (elapsed >= duration) {
+          await refreshPlayerStatus();
+          refreshQueue();
+        } else {
           player.mpd.status.elapsed = elapsed.toString();
           document.getElementById('elapsed').value = 100 * elapsed / duration;
         }
+      }
+
+      let updateElapsed = null;
+      const setUpdateElapsed = (val) => {
+        clearInterval(updateElapsed);
+        if (val > 0)
+          updateElapsed = setInterval(refreshElapsed, val);
       }
 
       const toggleShuffle = () => {
@@ -365,34 +295,97 @@
           mpdCmd('single', ['1']);
       }
 
-      const refreshStatus = async () => {
-        try {
-          if (firstTime) {
-            await getSpeakerStatus();
-            await getBtStatus();
-            await getBtDevices();
-            await getMpdStatus();
-            document.getElementById('outSel').value = 'spkrs';
-            if (player.bt.Powered === 'yes') document.getElementById('outSel').value = 'bt';
-            firstTime = false;
-          }
-          if (document.getElementById('outSel').value === 'spkrs') {
-            await getSpeakerStatus();
-            updateSpeakers();
+      const updateMpdPlayer = () => {
+        if (!player.mpd) return;
+        if (player.mpd.curSong) {
+          let desc = `${player.mpd.curSong.Artist} - ${player.mpd.curSong.Title} [${player.mpd.curSong.Album}]`;
+          if (desc.length > 58)
+            desc = `<center>${player.mpd.curSong.Artist}</center>\n<center>${player.mpd.curSong.Title}</center>\n<center>[${player.mpd.curSong.Album}]</center>`;
+          document.getElementById('song').innerHTML = desc;
+        }
+        if (player.mpd.status) {
+          if (player.mpd.status.error) alert(player.mpd.status.error);
+          document.getElementById('elapsed').value = 100 * parseFloat(player.mpd.status.elapsed) / parseFloat(player.mpd.status.duration);
+          if (player.mpd.status.random === '1')
+            document.getElementById('shuffle').style.color = null;
+          else
+            document.getElementById('shuffle').style.color = 'lightgray';
+          if (player.mpd.status.repeat === '1')
+            document.getElementById('repeat').style.color = null;
+          else
+            document.getElementById('repeat').style.color = 'lightgray';
+          if (player.mpd.status.single === '1')
+            document.getElementById('single').style.color = null;
+          else
+            document.getElementById('single').style.color = 'lightgray';
+          if (player.mpd.status.state === 'play') {
+            document.getElementById('play').className = "fa-solid fa-pause fa-xl";
+            refreshElapsed();
+            setUpdateElapsed(1000);
           } else {
-            await getBtStatus();
-            await getBtDevices();
-            updateBT();
+            document.getElementById('play').className = "fa-solid fa-play fa-xl";
+            setUpdateElapsed(0);
           }
-          showBtDevices();
-          await getMpdStatus();
-          updateMpd();
-          // DEBUG
-          // console.log(player);
         }
-        catch (err) {
-          alert(err.message);
+      }
+
+      // BLUETOOTH
+
+      const getBtStatus = () => {
+        return toutFetch(`/bt/status`, 5000)
+          .then(res => res.json())
+          .then(data => player.bt = data)
+      }
+
+      const getBtDevices = () => {
+        return toutFetch(`/bt/devices`, 5000)
+          .then(res => res.json())
+          .then(data => player.bt.devices = data)
+      }
+
+      const showBtDevices = () => {
+        if (document.getElementById('outSel').value === 'spkrs') {
+          // document.getElementById("outCfg").style.visibility = "hidden";
+          // document.getElementById("outCfg").style.opacity = 0;
+          closeBtDevMod();
         }
+        else {
+          // if (player.bt.Powered === 'yes') {
+          //   document.getElementById("outCfg").style.visibility = "visible";
+          //   document.getElementById("outCfg").style.opacity = 1;
+          // } else {
+          //   document.getElementById("outCfg").style.visibility = "hidden";
+          //   document.getElementById("outCfg").style.opacity = 0;
+          // }
+          if (player.bt.Powered !== 'yes') closeBtDevMod();
+        }
+      }
+
+      const connectDev = async (idx) => {
+        loadSpinner();
+        toutFetch(`/bt/device/connect/${player.bt.devices[idx].address}`, 60000, {
+          method: 'POST'
+        })
+          .then(() => {
+            // closeBtDevMod();
+            refreshPlayerStatus();
+          })
+          .catch((err) => alert(`Failed to connect to ${player.bt.devices[idx].name}: ${err.message}`))
+          .finally(() => unloadSpinner());
+      }
+
+      const deleteDev = async (idx) => {
+        toutFetch(`/bt/device/remove/${player.bt.devices[idx].address}`, 60000, {
+          method: 'POST'
+        })
+          .then(() => refreshPlayerStatus())
+          .catch((err) => alert(`Failed to remove ${player.bt.devices[idx].name}: ${err.message}`));
+      }
+
+      const devOnline = (idx) => {
+        if (player.bt.devices[idx].online)
+          return player.bt.devices[idx].online === "yes" ? "[online]" : "";
+        return "";
       }
 
       const findBTconnectedDev = async () => {
@@ -400,6 +393,69 @@
           if (dev.connected === "yes" && dev.volCtrl) return dev;
         return {};
       }
+
+      const openBtDevMod = () => {
+        if (document.getElementById("btDevMod").style.display === "block") return;
+        document.getElementById("btDevMod").style.display = "block";
+        periodicRefreshStatus(3000);
+        if (player.bt.Powered === 'yes') {
+          toutFetch('/bt/status/scan/on', 5000, {
+            method: 'POST'
+          })
+            // .then(() => refreshPlayerStatus())
+            .catch((err) => alert(err.message));
+        }
+      }
+
+      const closeBtDevMod = () => {
+        if (document.getElementById("btDevMod").style.display === "none") return;
+        setTimeout(periodicRefreshStatus, 20000, 30000);
+        document.getElementById("btDevMod").style.display = "none";
+        if (player.bt.Powered === 'yes') {
+          toutFetch('/bt/status/scan/off', 5000, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          })
+            .then(() => refreshPlayerStatus())
+            .catch((err) => alert(err.message));
+        }
+      }
+
+      const updateBT = () => {
+        if (!player.bt) return;
+        document.getElementById('outputSelect').innerHTML = (player.bt.Powered === 'yes' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
+        let btDevList = document.getElementById('btDevList');
+        btDevList.innerHTML = "";
+        let connectedDev = -1;
+        for (let [idx, dev] of player.bt.devices.entries()) {
+          if (dev.connected === 'yes') connectedDev = idx;
+          btDevList.innerHTML += `<div class="justify"><span onclick="connectDev(${idx})">${dev.name}</span><span>&emsp;&emsp;</span><span class="right">${devOnline(idx)}</span><span class="right"><i class="fa-regular fa-trash-can" onclick="deleteDev(${idx})"></i></span>`;
+        }
+        if (connectedDev >= 0) {
+          closeBtDevMod();
+          document.getElementById('btDevDesc').innerHTML = `<span>${player.bt.devices[connectedDev].name}</span><i class="fa-regular fa-battery-three-quarters"></i><span>${player.bt.devices[connectedDev].battery ? player.bt.devices[connectedDev].battery : ""}</span>`;
+          if (player.bt.devices[connectedDev].volume) {
+            document.getElementById('volRange').value = player.bt.devices[connectedDev].volume.split("%")[0];
+            document.getElementById('volLevel').innerText = player.bt.devices[connectedDev].volume.split("%")[0];
+            document.getElementById('volRange').disabled = false;
+          }
+          if (player.bt.devices[connectedDev].mute) {
+            document.getElementById('volMute').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark"></i>' : '<i class="fa-solid fa-volume-high"></i>';
+            document.getElementById('volMute2').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark"></i>' : '<i class="fa-solid fa-volume-high"></i>';
+          }
+        }
+        else {
+          if (player.bt.Powered === 'yes') openBtDevMod();
+          document.getElementById('btDevDesc').innerHTML = "";
+          document.getElementById('volRange').value = 0;
+          document.getElementById('volRange').disabled = true;
+          document.getElementById('volLevel').innerText = 0;
+          document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+          document.getElementById('volMute2').innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+        }
+      }
+
+      // VOLUME
 
       const volumeSet = async () => {
         if (document.getElementById('outSel').value === 'spkrs') {
@@ -412,7 +468,7 @@
             toutFetch(`/bt/volume/set/${dev.address}/${vol}%25`, 60000, {
               method: 'POST'
             })
-              .then(() => refreshStatus())
+              .then(() => refreshPlayerStatus())
               .catch((err) => alert(`Failed to set ${dev.name} volume to ${vol} - ${err.message}`));
         }
       }
@@ -435,7 +491,7 @@
           toutFetch(`/bt/volume/inc/${dev.address}`, 60000, {
             method: 'POST'
           })
-            .then(() => refreshStatus())
+            .then(() => refreshPlayerStatus())
             .catch((err) => alert(`Failed to increment ${dev.name} volume - ${err.message}`));
         }
       }
@@ -450,7 +506,7 @@
           toutFetch(`/bt/volume/dec/${dev.address}`, 60000, {
             method: 'POST'
           })
-            .then(() => refreshStatus())
+            .then(() => refreshPlayerStatus())
             .catch((err) => alert(`Failed to increment ${dev.name} volume - ${err.message}`));
         }
       }
@@ -465,35 +521,8 @@
             toutFetch(`/bt/volume/set/${dev.address}/${dev.mute === "yes" ? "unmute" : "mute"}`, 60000, {
               method: 'POST'
             })
-              .then(() => refreshStatus())
+              .then(() => refreshPlayerStatus())
               .catch((err) => alert(`Failed to set ${dev.name} volume to ${vol} - ${err.message}`));
-        }
-      }
-
-      const openBtDevMod = () => {
-        if (document.getElementById("btDevMod").style.display === "block") return;
-        document.getElementById("btDevMod").style.display = "block";
-        periodicRefreshStatus(3000);
-        if (player.bt.Powered === 'yes') {
-          toutFetch('/bt/status/scan/on', 5000, {
-            method: 'POST'
-          })
-            // .then(() => refreshStatus())
-            .catch((err) => alert(err.message));
-        }
-      }
-
-      const closeBtDevMod = () => {
-        if (document.getElementById("btDevMod").style.display === "none") return;
-        setTimeout(periodicRefreshStatus, 20000, 30000);
-        document.getElementById("btDevMod").style.display = "none";
-        if (player.bt.Powered === 'yes') {
-          toutFetch('/bt/status/scan/off', 5000, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          })
-            .then(() => refreshStatus())
-            .catch((err) => alert(err.message));
         }
       }
 
@@ -509,48 +538,66 @@
         document.getElementById("volumeMod").style.display = "none";
       }
 
-      let updateElapsed = null;
-      const setUpdateElapsed = (val) => {
-        clearInterval(updateElapsed);
-        if (val > 0)
-          updateElapsed = setInterval(refreshElapsed, val);
-      }
-
-      let refreshInterval = null;
-      const periodicRefreshStatus = (val) => {
-        clearInterval(refreshInterval);
-        refreshInterval = setInterval(refreshStatus, val);
-      }
-
       // CONTENT TAB
+
+      var files = {};
+      var selectedTab = null;
 
       function selectTab(tab) {
         if (selectedTab) selectedTab.classList.remove("selected");
         selectedTab = document.getElementById(tab);
         selectedTab.classList.add("selected");
       }
+
+      // QUEUE
+
+      var queue = {};
+
       const loadQueue = async () => {
+        loadSpinner();
         selectTab("queueTab");
-        document.getElementById("tabCt").innerHTML = "loading...";
         toutFetch(`/mpd/listinfo/playlistinfo`, 5000)
           .then(data => data.json())
           .then(data => {
             queue = data;
             if (queue.length) {
               let pl_content = '<ul class="tabCntLine">';
-              for (item of queue)
-                pl_content += `<li>${item.Artist} - ${item.Album} - ${item.Title}</li>`;
+              for (item of queue) {
+                let style = "";
+                let playing = "";
+                if (player.mpd.hasOwnProperty('curSong') &&
+                  player.mpd.curSong.Artist === item.Artist &&
+                  player.mpd.curSong.Album === item.Album &&
+                  player.mpd.curSong.Title === item.Title) {
+                  style = 'style="color: blue; "';
+                  if (player.mpd.status.state === "play")
+                    playing += '&nbsp&nbsp&nbsp&nbsp<i class="fa-solid fa-music fa-2xs"></i>';
+                }
+                pl_content += `<li ${style}>${item.Artist} - ${item.Album} - ${item.Title}${playing}</li>`;
+              }
               pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
             } else
               document.getElementById("tabCt").innerHTML = "Empty.";
           })
-          .catch(err => alert(err.message));
+          .catch(err => alert(err.message))
+          .finally(() => unloadSpinner());
+
       }
+
+      const refreshQueue = () => {
+        if (document.getElementById("queueTab").classList.contains("selected")) {
+          console.log("refreshing queue...");
+          loadQueue();
+        }
+      }
+
+      // PLAYLISTS
+
+      var playlists = {};
 
       const listPlaylists = async () => {
         selectTab("playlistsTab");
-        document.getElementById("tabCt").innerHTML = "loading...";
         toutFetch(`/mpd/listinfo/listplaylists`, 5000)
           .then(data => data.json())
           .then(data => {
@@ -569,7 +616,6 @@
 
       const loadFiles = async () => {
         selectTab("filesTab");
-        document.getElementById("tabCt").innerHTML = "loading...";
         toutFetch(`/mpd/listinfo/listfiles`, 5000)
           .then(data => data.json())
           .then((data) => {
@@ -591,16 +637,13 @@
       }
 
       // STARTUP
-      let inPrefs = JSON.parse(`<%-JSON.stringify(prefs)%>`);
-      player.speakers = {};
-      player.speakers.contactDevice = inPrefs.audioContactDev;
-      player.speakers.contactRelay = +inPrefs.audioContactRel;
-      let firstTime = true;
+      async function startup() {
+        await refreshPlayerStatus();
+        loadQueue();
+        periodicRefreshStatus(30000);
+      }
 
-      refreshStatus();
-      loadQueue();
-
-      periodicRefreshStatus(30000);
+      startup();
     </script>
 
 
