@@ -41,20 +41,20 @@
         </div>
       </div>
       <div class="center" style="padding: 10px;">
-        <span id="song" style="font-size: small;">Author - Song description - Album</span>
+        <span id="song" style="font-size: small;">-</span>
       </div>
       <div class="center" style="gap: 10px;">
         <div class="left" style="width: 60%;">
           <input type="range" min="1" max="100" value="0" class="slider" id="elapsed" onchange="setPosition(this.value)"
             onmousedown="setUpdateElapsed(0);" onmouseup="setUpdateElapsed(1000);">
         </div>
-        <span class="right" style="font-size: small;" id="duration">00:00 - 00:00</span>
+        <span class="right" style="font-size: small;" id="duration"> </span>
       </div>
       <div class="justify" style="padding-top: 10px;">
         <div class="justify" style="padding-left: 40px; padding-right: 40px;">
           <i class="fa-solid fa-shuffle fa-xs" style="color: lightgray;" id="shuffle" onclick="toggleShuffle()"></i>
           <i class="fa-solid fa-backward-step fa-sm" id="previous" onclick="mpdCmd('previous',[])"></i>
-          <i class="fa-solid fa-pause fa-xl" id="play" onclick="togglePlay()"></i>
+          <i class="fa-solid fa-play fa-xl" id="play" onclick="togglePlay()"></i>
           <i class="fa-solid fa-forward-step fa-sm" id="next" onclick="mpdCmd('next',[])"></i>
           <i class="fa-solid fa-repeat fa-xs" style="color: lightgray;" id="repeat" onclick="toggleRepeat()"></i>
           <i class="fa-solid fa-1 fa-xs" style="color: lightgray;" id="single" onclick="toggleSingle()"></i>
@@ -99,13 +99,46 @@
       <li onclick="loadQueue()" id="queueTab">Queue</li>
       <li onclick="listPlaylists()" id="playlistsTab">Playlists</li>
       <li onclick="loadFiles()" id="filesTab">Files</li>
-      <li onclick="loadRadio()" id="radioTab">Radios</li>
-      <li onclick="loadRadio()" id="radioTab">Podcasts</li>
+      <li onclick="loadStreaming()" id="streamingTab">Streamings</li>
+      <li onclick="loadPodcast()" id="podcastTab">Podcasts</li>
     </ul>
     <div class="tabContent" id="tabCt">
     </div>
-    <div class="noGrowNoShrink" style="height: 50px;">
-      comandi
+    <div class="cmdLine" id="queueCmds" style="display: none;">
+      <button class="cmdBtn" onclick="initLiSelected()">cancel selection</button>
+      <button class="cmdBtn">remove</button>
+      <button class="cmdBtn">play</button>
+    </div>
+    <div class="cmdLine" id="playlistCmds" style="display: none;">
+      <button class="cmdBtn" onclick="initLiSelected()">cancel selection</button>
+      <button class="cmdBtn" onclick="plReplQueue()">replace queue</button>
+      <button class="cmdBtn" onclick="plAddToQueue()">add to queue</button>
+      <button class="cmdBtn" onclick="plModify()">modify</button>
+      <button class="cmdBtn" onclick="plRemove()">remove</button>
+    </div>
+    <div class="cmdLine" id="filesCmds" style="display: none;">
+      <button class="cmdBtn" onclick="initLiSelected()">cancel selection</button>
+      <button class="cmdBtn">replace queue</button>
+      <button class="cmdBtn">add to queue</button>
+      <button class=" cmdBtn">modify</button>
+      <button class="cmdBtn">remove</button>
+    </div>
+    <div class="noGrowNoShrink justify" style="height: 50px;">
+      <div class="justify" id="queueFn">
+        <div class="left" style="font-size: medium;">
+          <span id="queueDuration"></span>
+        </div>
+        <div class="right">
+          <button onclick="clearQueue()">clear</button>
+        </div>
+      </div>
+      <div class="justify" id="playlistsFn" style="display: none;">
+        <div class="left" style="font-size: medium;">
+        </div>
+        <div class="right">
+          <button onclick="newPlaylist()">new playlist</button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -172,7 +205,7 @@
           await getMpdStatus();
           updateMpdPlayer();
           // DEBUG
-          console.log(player);
+          // console.log(player);
         }
         catch (err) {
           alert(err.message);
@@ -230,29 +263,36 @@
       }
 
       const setPosition = async (perc) => {
-        setUpdateElapsed(0);
-        let duration = parseFloat(player.mpd.status.duration);
-        await mpdCmd('seekcur', [duration * perc / 100]);
-        setUpdateElapsed(1000);
+        if (player.hasOwnProperty('mpd')
+          && player.mpd.hasOwnProperty('curSong')
+          && player.mpd.hasOwnProperty('status')
+          && !player.mpd.curSong.file.startsWith('http')) {
+          setUpdateElapsed(0);
+          let duration = parseFloat(player.mpd.status.duration);
+          await mpdCmd('seekcur', [duration * perc / 100]);
+          setUpdateElapsed(1000);
+        }
       }
 
       const refreshElapsed = async () => {
         if (!player.mpd || !player.mpd.status) return;
-        let elapsed = parseFloat(player.mpd.status.elapsed) + 1.0;
-        let duration = parseFloat(player.mpd.status.duration);
-        let eh = Math.trunc(elapsed / 3600);
-        let em = Math.trunc((elapsed % 3600) / 60);
-        let es = Math.trunc((elapsed % 3600) % 60);
-        let dh = Math.trunc(duration / 3600);
-        let dm = Math.trunc((duration % 3600) / 60);
-        let ds = Math.trunc((duration % 3600) % 60);
-        document.getElementById('duration').innerText = `${eh > 0 ? eh + ":" : ""}${String(em).padStart(2, '0')}:${String(es).padStart(2, '0')} - ${dh > 0 ? dh + ":" : ""}${String(dm).padStart(2, '0')}:${String(ds).padStart(2, '0')}`;
-        if (elapsed >= duration) {
-          await refreshPlayerStatus();
-          refreshQueue();
-        } else {
+        if (!player.mpd.hasOwnProperty('curSong')) return;
+        if (player.mpd.curSong.file.startsWith('http')) {
+          let elapsed = parseFloat(player.mpd.status.elapsed) + 1.0;
           player.mpd.status.elapsed = elapsed.toString();
-          document.getElementById('elapsed').value = 100 * elapsed / duration;
+          document.getElementById('duration').innerText = `${secsToString(elapsed)}`;
+          document.getElementById('elapsed').value = 0;
+        } else {
+          let elapsed = parseFloat(player.mpd.status.elapsed) + 1.0;
+          let duration = parseFloat(player.mpd.status.duration);
+          document.getElementById('duration').innerText = `${secsToString(elapsed)} - ${secsToString(duration)}`;
+          if (elapsed >= duration) {
+            await refreshPlayerStatus();
+            refreshQueue();
+          } else {
+            player.mpd.status.elapsed = elapsed.toString();
+            document.getElementById('elapsed').value = 100 * elapsed / duration;
+          }
         }
       }
 
@@ -295,17 +335,37 @@
           mpdCmd('single', ['1']);
       }
 
+      function playerDefault() {
+        document.getElementById('song').innerHTML = "-";
+        document.getElementById('duration').innerText = "";
+        document.getElementById('elapsed').value = 0;
+        document.getElementById('play').className = "fa-solid fa-play fa-xl";
+      }
+
       const updateMpdPlayer = () => {
-        if (!player.mpd) return;
+        if (!player.hasOwnProperty('mpd') || !player.mpd.hasOwnProperty('curSong') || !player.mpd.curSong.hasOwnProperty('file')) {
+          playerDefault();
+          return;
+        }
         if (player.mpd.curSong) {
-          let desc = `${player.mpd.curSong.Artist} - ${player.mpd.curSong.Title} [${player.mpd.curSong.Album}]`;
-          if (desc.length > 58)
-            desc = `<center>${player.mpd.curSong.Artist}</center>\n<center>${player.mpd.curSong.Title}</center>\n<center>[${player.mpd.curSong.Album}]</center>`;
+          let desc = "";
+          if (player.mpd.curSong.file.startsWith('http')) {
+            if (player.mpd.curSong.hasOwnProperty('Name'))
+              desc = `${player.mpd.curSong.Name}`;
+            else
+              desc = `${player.mpd.curSong.file}`;
+          } else {
+            if (!player.mpd.curSong.Artist)
+              player.mpd.curSong.Artist = player.mpd.curSong.AlbumArtist;
+            desc = `${player.mpd.curSong.Artist} - ${player.mpd.curSong.Title} [${player.mpd.curSong.Album}]`;
+            if (desc.length > 58)
+              desc = `<center>${player.mpd.curSong.Artist}</center>\n<center>${player.mpd.curSong.Title}</center>\n<center>[${player.mpd.curSong.Album}]</center>`;
+          }
           document.getElementById('song').innerHTML = desc;
         }
         if (player.mpd.status) {
           if (player.mpd.status.error) alert(player.mpd.status.error);
-          document.getElementById('elapsed').value = 100 * parseFloat(player.mpd.status.elapsed) / parseFloat(player.mpd.status.duration);
+          //document.getElementById('elapsed').value = 100 * parseFloat(player.mpd.status.elapsed) / parseFloat(player.mpd.status.duration);
           if (player.mpd.status.random === '1')
             document.getElementById('shuffle').style.color = null;
           else
@@ -345,18 +405,9 @@
 
       const showBtDevices = () => {
         if (document.getElementById('outSel').value === 'spkrs') {
-          // document.getElementById("outCfg").style.visibility = "hidden";
-          // document.getElementById("outCfg").style.opacity = 0;
           closeBtDevMod();
         }
         else {
-          // if (player.bt.Powered === 'yes') {
-          //   document.getElementById("outCfg").style.visibility = "visible";
-          //   document.getElementById("outCfg").style.opacity = 1;
-          // } else {
-          //   document.getElementById("outCfg").style.visibility = "hidden";
-          //   document.getElementById("outCfg").style.opacity = 0;
-          // }
           if (player.bt.Powered !== 'yes') closeBtDevMod();
         }
       }
@@ -540,7 +591,6 @@
 
       // CONTENT TAB
 
-      var files = {};
       var selectedTab = null;
 
       function selectTab(tab) {
@@ -549,47 +599,151 @@
         selectedTab.classList.add("selected");
       }
 
+      // CONTENT FOOTNOTE
+
+      var selectedFN = null;
+
+      function selectFN(name) {
+        if (selectedFN) selectedFN.style.display = "none";
+        selectedFN = document.getElementById(name);
+        selectedFN.style.display = "flex";
+      }
+
+      // CONTENT SELECTION
+      var selectedCmds = null;
+
+      function selectCmds(name) {
+        if (selectedCmds) selectedCmds.style.display = "none";
+        selectedCmds = document.getElementById(name);
+        initLiSelected();
+      }
+
+      function showCmds() {
+        if (selectCmds) selectedCmds.style.display = "flex";
+      }
+
+      function hideCmds() {
+        if (selectCmds) selectedCmds.style.display = "none";
+      }
+
+      var liSelected = [];
+      var multipleliSelect = false;
+
+      let liSelectTimeout = null;
+
+      function initLiSelected() {
+        multipleliSelect = false;
+        for (item of liSelected) {
+          document.getElementById(`li_${item}`).style.backgroundColor = "transparent";
+        }
+        liSelected = [];
+        hideCmds();
+      }
+
+      function liSelectMultiple() {
+        multipleliSelect = true;
+        for (item of liSelected) {
+          document.getElementById(`li_${item}`).style.backgroundColor = "lightskyblue";
+        }
+      }
+
+      const limu = (val) => {
+        clearTimeout(liSelectTimeout);
+      }
+
+      function limd(idx) {
+        if (multipleliSelect) {
+          if (liSelected.includes(idx)) {
+            liSelected.splice(liSelected.indexOf(idx), 1);
+            document.getElementById(`li_${idx}`).style.backgroundColor = "transparent";
+            if (liSelected.length === 0) hideCmds();
+          } else {
+            if (liSelected.length === 0) showCmds();
+            liSelected.push(idx);
+            document.getElementById(`li_${idx}`).style.backgroundColor = "lightskyblue";
+          }
+        } else {
+          showCmds();
+          for (item of liSelected) {
+            document.getElementById(`li_${item}`).style.backgroundColor = "transparent";
+          }
+          liSelected = [];
+          liSelected.push(idx);
+          document.getElementById(`li_${idx}`).style.backgroundColor = "lightblue";
+          liSelectTimeout = setTimeout(liSelectMultiple, 1000);
+        }
+        console.log(liSelected);
+      }
+
       // QUEUE
 
       var queue = {};
 
+      function getQueueDes(item) {
+        let res = { desc: "", style: "", playing: "" };
+        if (item.file.startsWith('http')) {
+          if (item.hasOwnProperty('Name'))
+            res.desc = `${item.Name} - <small><i>${item.file.replaceAll(',', ':')}</i></small>`;
+          else
+            res.desc = `${item.file}`;
+        } else {
+          if (!item.hasOwnProperty('Artist')) item.Artist = item.AlbumArtist;
+          res.desc = `${item.Artist} - ${item.Album} - ${item.Title}`;
+        }
+        if (player.mpd.hasOwnProperty('curSong') &&
+          player.mpd.curSong.file === item.file) {
+          res.style = 'style="color: blue; "';
+          if (player.mpd.status.state === "play")
+            res.playing += '&nbsp&nbsp&nbsp&nbsp<i class="fa-solid fa-music fa-2xs"></i>';
+        }
+        return res;
+      }
+
       const loadQueue = async () => {
         loadSpinner();
         selectTab("queueTab");
+        selectFN("queueFn");
+        selectCmds("queueCmds");
         toutFetch(`/mpd/listinfo/playlistinfo`, 5000)
           .then(data => data.json())
           .then(data => {
-            queue = data;
-            if (queue.length) {
-              let pl_content = '<ul class="tabCntLine">';
-              for (item of queue) {
-                let style = "";
-                let playing = "";
-                if (player.mpd.hasOwnProperty('curSong') &&
-                  player.mpd.curSong.Artist === item.Artist &&
-                  player.mpd.curSong.Album === item.Album &&
-                  player.mpd.curSong.Title === item.Title) {
-                  style = 'style="color: blue; "';
-                  if (player.mpd.status.state === "play")
-                    playing += '&nbsp&nbsp&nbsp&nbsp<i class="fa-solid fa-music fa-2xs"></i>';
-                }
-                pl_content += `<li ${style}>${item.Artist} - ${item.Album} - ${item.Title}${playing}</li>`;
+            queue.songs = data;
+            queue.duration = 0.0;
+            if (queue.songs.length) {
+              let pl_content = '<ul class="tabCntList">';
+              for ([idx, item] of queue.songs.entries()) {
+                if (parseFloat(item.duration))
+                  queue.duration += parseFloat(item.duration);
+                let qline = getQueueDes(item);
+                pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
               }
+              // DEBUG
+              // console.log(queue);
               pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
-            } else
-              document.getElementById("tabCt").innerHTML = "Empty.";
+              document.getElementById("queueDuration").innerText = secsToString(queue.duration);
+            } else {
+              document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+              document.getElementById("queueDuration").innerText = "";
+
+            }
           })
           .catch(err => alert(err.message))
           .finally(() => unloadSpinner());
 
       }
 
-      const refreshQueue = () => {
-        if (document.getElementById("queueTab").classList.contains("selected")) {
-          console.log("refreshing queue...");
-          loadQueue();
+      const clearQueue = () => {
+        if (queue.hasOwnProperty('songs') && queue.songs.length > 0) {
+          let text = "This is gonna clear the queue...";
+          if (confirm(text) == true) {
+            mpdCmd('clear', []);
+          }
         }
+      }
+
+      const refreshQueue = () => {
+        if (document.getElementById("queueTab").classList.contains("selected")) loadQueue();
       }
 
       // PLAYLISTS
@@ -598,40 +752,72 @@
 
       const listPlaylists = async () => {
         selectTab("playlistsTab");
+        selectFN("playlistsFn");
+        selectCmds("playlistCmds");
         toutFetch(`/mpd/listinfo/listplaylists`, 5000)
           .then(data => data.json())
           .then(data => {
             playlists = data;
             if (playlists.length) {
-              let pl_content = '<ul class="tabCntLine">';
-              for (item of playlists)
-                pl_content += `<li>${item.playlist}</li>`;
+              let pl_content = '<ul class="tabCntList">';
+              for ([idx, item] of playlists.entries())
+                pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">${item.playlist}</li>`;
               pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
             } else
-              document.getElementById("tabCt").innerHTML = "Empty.";
+              document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
           })
           .catch(err => alert(err.message));
       }
 
+      function newPlaylist() {
+        alert("not implemented");
+      }
+
+      function plReplQueue() {
+        mpdCmd('clear', [])
+          //          .then(() => mpdCmd('load', liSelected.map(el => playlists[el].playlist)))
+          .then(() => liSelected.map(el => mpdCmd('load', [playlists[el].playlist])))
+          .catch(err => alert(err.message))
+          .finally(() => initLiSelected());
+      }
+
+      function plAddToQueue() {
+        liSelected.map(el => mpdCmd('load', [playlists[el].playlist]));
+        initLiSelected();
+      }
+
+      function plModify() {
+        alert("not implemented");
+      }
+
+      function plRemove() {
+        alert("not implemented");
+      }
+
+      // FILES
+
+      var files = {};
+
       const loadFiles = async () => {
         selectTab("filesTab");
+        selectCmds("filesCmds");
         toutFetch(`/mpd/listinfo/listfiles`, 5000)
           .then(data => data.json())
           .then((data) => {
             files = data;
             if (files.length) {
-              let pl_content = '<ul class="tabCntLine">';
-              for (item of files) {
+              let pl_content = '<ul class="tabCntList">';
+              for ([idx, item] of files.entries()) {
                 if (item.directory)
-                  pl_content += `<li>directory: ${item.directory}</li>`;
+                  pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">directory: ${item.directory}</li>`;
                 if (item.file)
-                  pl_content += `<li>file: ${item.file}</li>`;
+                  pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">file: ${item.file}</li>`;
               }
               pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
             } else
-              document.getElementById("tabCt").innerHTML = "Empty.";
+              document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
           })
           .catch(err => alert(err.message));
       }
