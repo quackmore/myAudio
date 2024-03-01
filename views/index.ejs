@@ -99,7 +99,7 @@
       <li onclick="loadQueue()" id="queueTab">Queue</li>
       <li onclick="listPlaylists()" id="playlistsTab">Playlists</li>
       <li onclick="loadFiles()" id="filesTab">Files</li>
-      <li onclick="loadStreaming()" id="streamingTab">Streamings</li>
+      <li onclick="loadStreams()" id="streamsTab">Streams</li>
       <li onclick="loadPodcast()" id="podcastTab">Podcasts</li>
     </ul>
     <div class="tabContent" id="tabCt">
@@ -118,10 +118,14 @@
     </div>
     <div class="cmdLine" id="filesCmds" style="display: none;">
       <button class="cmdBtn" onclick="initLiSelected()">cancel selection</button>
-      <button class="cmdBtn">replace queue</button>
-      <button class="cmdBtn">add to queue</button>
-      <button class=" cmdBtn">modify</button>
-      <button class="cmdBtn">remove</button>
+      <button class="cmdBtn" onclick="fsReplQueue()">replace queue</button>
+      <button class="cmdBtn" onclick="fsAddToQueue()">add to queue</button>
+    </div>
+    <div class="cmdLine" id="streamsCmds" style="display: none;">
+      <button class="cmdBtn" onclick="initLiSelected()">cancel selection</button>
+      <button class="cmdBtn" onclick="stReplQueue()">play</button>
+      <button class=" cmdBtn" onclick="stModify()">modify</button>
+      <button class="cmdBtn" onclick="stRemove()">remove</button>
     </div>
     <div class="noGrowNoShrink justify" style="height: 50px;">
       <div class="justify" id="queueFn">
@@ -137,6 +141,20 @@
         </div>
         <div class="right">
           <button onclick="newPlaylist()">new playlist</button>
+        </div>
+      </div>
+      <div class="justify" id="filesFn" style="display: none;">
+        <div class="left" style="font-size: medium;">
+        </div>
+        <div class="right">
+          <button onclick="goBack()" id="goBack" disabled>back</button>
+        </div>
+      </div>
+      <div class="justify" id="streamsFn" style="display: none;">
+        <div class="left" style="font-size: medium;">
+        </div>
+        <div class="right">
+          <button onclick="newStream()">new stream</button>
         </div>
       </div>
     </div>
@@ -205,7 +223,7 @@
           await getMpdStatus();
           updateMpdPlayer();
           // DEBUG
-          // console.log(player);
+          console.log(player);
         }
         catch (err) {
           alert(err.message);
@@ -353,7 +371,7 @@
             if (player.mpd.curSong.hasOwnProperty('Name'))
               desc = `${player.mpd.curSong.Name}`;
             else
-              desc = `${player.mpd.curSong.file}`;
+              desc = `${player.mpd.curSong.file.replaceAll(',', ':')}`;
           } else {
             if (!player.mpd.curSong.Artist)
               player.mpd.curSong.Artist = player.mpd.curSong.AlbumArtist;
@@ -685,7 +703,7 @@
           if (item.hasOwnProperty('Name'))
             res.desc = `${item.Name} - <small><i>${item.file.replaceAll(',', ':')}</i></small>`;
           else
-            res.desc = `${item.file}`;
+            res.desc = `${item.file.replaceAll(',', ':')}`;
         } else {
           if (!item.hasOwnProperty('Artist')) item.Artist = item.AlbumArtist;
           res.desc = `${item.Artist} - ${item.Album} - ${item.Title}`;
@@ -721,7 +739,10 @@
               // console.log(queue);
               pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
-              document.getElementById("queueDuration").innerText = secsToString(queue.duration);
+              if (queue.songs[0].file.startsWith('http'))
+                document.getElementById("queueDuration").innerText = '';
+              else
+                document.getElementById("queueDuration").innerText = secsToString(queue.duration);
             } else {
               document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
               document.getElementById("queueDuration").innerText = "";
@@ -776,14 +797,13 @@
 
       function plReplQueue() {
         mpdCmd('clear', [])
-          //          .then(() => mpdCmd('load', liSelected.map(el => playlists[el].playlist)))
           .then(() => liSelected.map(el => mpdCmd('load', [playlists[el].playlist])))
           .catch(err => alert(err.message))
           .finally(() => initLiSelected());
       }
 
       function plAddToQueue() {
-        liSelected.map(el => mpdCmd('load', [playlists[el].playlist]));
+        liSelected.map(el => mpdCmd('load', [encodeURIComponent(playlists[el].playlist)]));
         initLiSelected();
       }
 
@@ -798,11 +818,15 @@
       // FILES
 
       var files = {};
+      var curPath = "";
+      var prevPath = [];
 
       const loadFiles = async () => {
         selectTab("filesTab");
+        selectFN("filesFn");
         selectCmds("filesCmds");
-        toutFetch(`/mpd/listinfo/listfiles`, 5000)
+        let url = "/mpd/listinfo/listfiles" + curPath;
+        toutFetch(`/mpd/listinfo/listfiles/${encodeURIComponent(curPath)}`, 5000)
           .then(data => data.json())
           .then((data) => {
             files = data;
@@ -810,9 +834,9 @@
               let pl_content = '<ul class="tabCntList">';
               for ([idx, item] of files.entries()) {
                 if (item.directory)
-                  pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">directory: ${item.directory}</li>`;
+                  pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}"><button onclick="enterDir('${item.directory}')">${item.directory}</button></li>`;
                 if (item.file)
-                  pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">file: ${item.file}</li>`;
+                  pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">${item.file}</li>`;
               }
               pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
@@ -820,6 +844,86 @@
               document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
           })
           .catch(err => alert(err.message));
+      }
+
+      function enterDir(directory) {
+        prevPath.push(curPath);
+        document.getElementById("goBack").disabled = false;
+        if (curPath === "")
+          curPath += directory;
+        else
+          curPath += `/${directory}`;
+        loadFiles();
+      }
+
+      function goBack() {
+        if (prevPath.length === 0) return;
+        curPath = prevPath.pop();
+        if (prevPath.length === 0) document.getElementById("goBack").disabled = true;
+        loadFiles();
+      }
+
+      function fsReplQueue() {
+        mpdCmd('clear', [])
+          .then(() => liSelected.map(el => mpdCmd('add', [encodeURIComponent((curPath === "" ? curPath : curPath + '/') + (files[el].directory ? files[el].directory : files[el].file))])))
+          .catch(err => alert(err.message))
+          .finally(() => initLiSelected());
+      }
+
+      function fsAddToQueue() {
+        liSelected.map(el => mpdCmd('add', [encodeURIComponent((curPath === "" ? curPath : curPath + '/') + (files[el].directory ? files[el].directory : files[el].file))]));
+        initLiSelected();
+      }
+
+      // STREAMS
+
+      var streams = {};
+
+      const loadStreams = async () => {
+        selectTab("streamsTab");
+        selectFN("streamsFn");
+        selectCmds("streamsCmds");
+        toutFetch(`/stream`, 5000)
+          .then(data => data.json())
+          .then(data => {
+            streams = data;
+            if (streams.length) {
+              let pl_content = '<ul class="tabCntList">';
+              for ([idx, item] of streams.entries())
+                pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">${item.name} - <small><i>${item.location}</i></small></li>`;
+              pl_content += "</ul>";
+              document.getElementById("tabCt").innerHTML = pl_content;
+            } else
+              document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+          })
+          .catch(err => alert(err.message));
+      }
+
+      function newStream() {
+        alert("not implemented");
+      }
+
+      function stReplQueue() {
+        let req = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: `{"playlist": "#EXTM3U\\n\\n#EXTALB: ${streams[liSelected[0]].name}\\n#EXTINF:111, ${streams[liSelected[0]].name}\\n${streams[liSelected[0]].location}\\n"}`
+        };
+        mpdCmd('clear', [])
+          .then(() => toutFetch(`/stream/createStreamingPlaylist`, 5000, req))
+          .then(() => mpdCmd('load', ['streaming']))
+          .then(() => mpdCmd('play', []))
+          .then(() => toutFetch(`/stream/deleteStreamingPlaylist`, 5000, { method: 'POST' }))
+          .catch(err => alert(err.message))
+          .finally(() => initLiSelected());
+      }
+
+      function stModify() {
+        alert("not implemented");
+      }
+
+      function stRemove() {
+        alert("not implemented");
       }
 
       // STARTUP

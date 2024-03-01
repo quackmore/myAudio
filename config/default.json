@@ -11,7 +11,9 @@
     "player": {
         "contactDevice": "192.168.1.185",
         "contactRelay": 2,
-        "alsaCfg": "/home/flintheart/.asoundrc"
+        "alsaCfg": "/home/flintheart/.asoundrc",
+        "streamsFile": "/home/flintheart/Music/streams/streams.json",
+        "streamingPlaylist": "/home/flintheart/.config/mpd/streaming.m3u"
     },
     "logger": {
         "console_log": "ON",
