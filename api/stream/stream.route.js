@@ -26,7 +26,6 @@ router.post('/', async function (req, res, next) {
 
 router.post('/createStreamingPlaylist', async function (req, res, next) {
   try {
-    console.log(req.body);
     fs.writeFileSync(cfg.get('player.streamingPlaylist'), req.body.playlist);
     res.sendStatus(200);
   } catch (err) {

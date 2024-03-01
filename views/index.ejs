@@ -105,24 +105,22 @@
     <div class="tabContent" id="tabCt">
     </div>
     <div class="cmdLine" id="queueCmds" style="display: none;">
-      <button class="cmdBtn" onclick="initLiSelected()">cancel selection</button>
-      <button class="cmdBtn">remove</button>
-      <button class="cmdBtn">play</button>
+      <button class="cmdBtn" onclick="quRemove()">remove</button>
+      <button class="cmdBtn" onclick="quPlay()">play</button>
+      <button class="cmdBtn" onclick="quAddToPlaylist()">add to playlist</button>
     </div>
     <div class="cmdLine" id="playlistCmds" style="display: none;">
-      <button class="cmdBtn" onclick="initLiSelected()">cancel selection</button>
       <button class="cmdBtn" onclick="plReplQueue()">replace queue</button>
       <button class="cmdBtn" onclick="plAddToQueue()">add to queue</button>
       <button class="cmdBtn" onclick="plModify()">modify</button>
       <button class="cmdBtn" onclick="plRemove()">remove</button>
     </div>
     <div class="cmdLine" id="filesCmds" style="display: none;">
-      <button class="cmdBtn" onclick="initLiSelected()">cancel selection</button>
       <button class="cmdBtn" onclick="fsReplQueue()">replace queue</button>
       <button class="cmdBtn" onclick="fsAddToQueue()">add to queue</button>
+      <button class="cmdBtn" onclick="fsAddToPlaylist()">add to playlist</button>
     </div>
     <div class="cmdLine" id="streamsCmds" style="display: none;">
-      <button class="cmdBtn" onclick="initLiSelected()">cancel selection</button>
       <button class="cmdBtn" onclick="stReplQueue()">play</button>
       <button class=" cmdBtn" onclick="stModify()">modify</button>
       <button class="cmdBtn" onclick="stRemove()">remove</button>
@@ -133,6 +131,8 @@
           <span id="queueDuration"></span>
         </div>
         <div class="right">
+          <button onclick="initLiSelected()" id="cancel1" disabled>cancel</button>
+          <button onclick="saveQueue()">save</button>
           <button onclick="clearQueue()">clear</button>
         </div>
       </div>
@@ -140,13 +140,14 @@
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
-          <button onclick="newPlaylist()">new playlist</button>
+          <button onclick="initLiSelected()" id="cancel2" disabled>cancel</button>
         </div>
       </div>
       <div class="justify" id="filesFn" style="display: none;">
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
+          <button onclick="initLiSelected()" id="cancel3" disabled>cancel</button>
           <button onclick="goBack()" id="goBack" disabled>back</button>
         </div>
       </div>
@@ -154,6 +155,7 @@
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
+          <button onclick="initLiSelected()" id="cancel4" disabled>cancel</button>
           <button onclick="newStream()">new stream</button>
         </div>
       </div>
@@ -638,10 +640,18 @@
 
       function showCmds() {
         if (selectCmds) selectedCmds.style.display = "flex";
+        document.getElementById("cancel1").disabled = false;
+        document.getElementById("cancel2").disabled = false;
+        document.getElementById("cancel3").disabled = false;
+        document.getElementById("cancel4").disabled = false;
       }
 
       function hideCmds() {
         if (selectCmds) selectedCmds.style.display = "none";
+        document.getElementById("cancel1").disabled = true;
+        document.getElementById("cancel2").disabled = true;
+        document.getElementById("cancel3").disabled = true;
+        document.getElementById("cancel4").disabled = true;
       }
 
       var liSelected = [];
@@ -690,7 +700,8 @@
           document.getElementById(`li_${idx}`).style.backgroundColor = "lightblue";
           liSelectTimeout = setTimeout(liSelectMultiple, 1000);
         }
-        console.log(liSelected);
+        // DEBUG
+        // console.log(liSelected);
       }
 
       // QUEUE
@@ -767,6 +778,22 @@
         if (document.getElementById("queueTab").classList.contains("selected")) loadQueue();
       }
 
+      function saveQueue() {
+        alert("not implemented");
+      }
+
+      function quRemove() {
+        alert("not implemented");
+      }
+
+      function quPlay() {
+        alert("not implemented");
+      }
+
+      function quAddToPlaylist() {
+        alert("not implemented");
+      }
+
       // PLAYLISTS
 
       var playlists = {};
@@ -789,10 +816,6 @@
               document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
           })
           .catch(err => alert(err.message));
-      }
-
-      function newPlaylist() {
-        alert("not implemented");
       }
 
       function plReplQueue() {
@@ -873,6 +896,10 @@
       function fsAddToQueue() {
         liSelected.map(el => mpdCmd('add', [encodeURIComponent((curPath === "" ? curPath : curPath + '/') + (files[el].directory ? files[el].directory : files[el].file))]));
         initLiSelected();
+      }
+
+      function fsAddToPlaylist() {
+        alert("not implemented");
       }
 
       // STREAMS
