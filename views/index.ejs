@@ -104,6 +104,13 @@
     </ul>
     <div class="tabContent" id="tabCt">
     </div>
+    <div class="cmdLine" id="plSelCmd" style="display: none;">
+      <select class="myselect cmdBtn" name="plSelect" id="plSelect">
+        <option value="">new playlist...</option>
+      </select>
+      <button class="cmdBtn" id="plSelConfirm" onclick="">confirm</button>
+      <button class="cmdBtn" onclick="hideSelectPlaylist()">cancel</button>
+    </div>
     <div class="cmdLine" id="queueCmds" style="display: none;">
       <button class="cmdBtn" onclick="quRemove()">remove</button>
       <button class="cmdBtn" onclick="quPlay()">play</button>
@@ -225,7 +232,7 @@
           await getMpdStatus();
           updateMpdPlayer();
           // DEBUG
-          console.log(player);
+          // console.log(player);
         }
         catch (err) {
           alert(err.message);
@@ -704,6 +711,28 @@
         // console.log(liSelected);
       }
 
+      function showSelectPlaylist(onConfirm) {
+        document.getElementById("plSelCmd").style.display = "flex";
+        document.getElementById("plSelConfirm").onclick = onConfirm;
+        toutFetch(`/mpd/listinfo/listplaylists`, 5000)
+          .then(data => data.json())
+          .then(data => {
+            document.getElementById("plSelect").innerHTML = "<option value=''>new playlist...</option>";
+            data
+              .sort((a, b) => {
+                if (a.playlist < b.playlist) return -1;
+                if (a.playlist > b.playlist) return 1;
+                return 0;
+              })
+              .map(el => document.getElementById("plSelect").innerHTML += `<option value="${el.playlist}">${el.playlist}</option>`);
+          })
+          .catch(err => alert(err.message));
+      }
+
+      function hideSelectPlaylist() {
+        document.getElementById("plSelCmd").style.display = "none";
+      }
+
       // QUEUE
 
       var queue = {};
@@ -779,20 +808,32 @@
       }
 
       function saveQueue() {
-        alert("not implemented");
+        let name = prompt("Enter playlist name");
+        if (name != null)
+          mpdCmd('save', [name]);
       }
 
       function quRemove() {
-        alert("not implemented");
+        liSelected.map(el => mpdCmd('deleteid', [queue.songs[el].Id]));
       }
 
       function quPlay() {
-        alert("not implemented");
+        mpdCmd('play', [queue.songs[liSelected[0]].Pos]);
       }
 
       function quAddToPlaylist() {
-        alert("not implemented");
+        showSelectPlaylist(quAddToPlaylistConfirm);
       }
+
+      function quAddToPlaylistConfirm() {
+        let name = document.getElementById("plSelect").value;
+        if (name === '')
+          name = prompt("Enter playlist name");
+        if (name != null)
+          liSelected.map(el => mpdCmd('playlistadd', [name, encodeURIComponent(queue.songs[el].file)]));
+        hideSelectPlaylist();
+      }
+
 
       // PLAYLISTS
 
@@ -805,7 +846,11 @@
         toutFetch(`/mpd/listinfo/listplaylists`, 5000)
           .then(data => data.json())
           .then(data => {
-            playlists = data;
+            playlists = data.sort((a, b) => {
+              if (a.playlist < b.playlist) return -1;
+              if (a.playlist > b.playlist) return 1;
+              return 0;
+            });
             if (playlists.length) {
               let pl_content = '<ul class="tabCntList">';
               for ([idx, item] of playlists.entries())
@@ -835,7 +880,8 @@
       }
 
       function plRemove() {
-        alert("not implemented");
+        liSelected.map(el => mpdCmd('rm', [playlists[el].playlist]));
+        listPlaylists();
       }
 
       // FILES
@@ -844,6 +890,8 @@
       var curPath = "";
       var prevPath = [];
 
+      const musicExts = ['mp3', 'mp4', 'm4a', 'flac', 'wav', 'wma', 'aac', 'ogg', 'aiff'];
+
       const loadFiles = async () => {
         selectTab("filesTab");
         selectFN("filesFn");
@@ -851,6 +899,10 @@
         let url = "/mpd/listinfo/listfiles" + curPath;
         toutFetch(`/mpd/listinfo/listfiles/${encodeURIComponent(curPath)}`, 5000)
           .then(data => data.json())
+          .then(data => data.filter((el) => {
+            if (el.directory) return true;
+            if (el.file) return musicExts.includes(el.file.split('.').pop())
+          }))
           .then((data) => {
             files = data;
             if (files.length) {
