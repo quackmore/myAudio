@@ -112,24 +112,24 @@
       <button class="cmdBtn" onclick="hideSelectPlaylist()">cancel</button>
     </div>
     <div class="cmdLine" id="queueCmds" style="display: none;">
-      <button class="cmdBtn" onclick="quRemove()">remove</button>
-      <button class="cmdBtn" onclick="quPlay()">play</button>
       <button class="cmdBtn" onclick="quAddToPlaylist()">add to playlist</button>
+      <button class="cmdBtn" onclick="quPlay()">play</button>
+      <button class="cmdBtn" onclick="quRemove()">remove</button>
     </div>
     <div class="cmdLine" id="playlistCmds" style="display: none;">
-      <button class="cmdBtn" onclick="plReplQueue()">replace queue</button>
       <button class="cmdBtn" onclick="plAddToQueue()">add to queue</button>
+      <button class="cmdBtn" onclick="plReplQueue()">replace queue</button>
       <button class="cmdBtn" onclick="plModify()">modify</button>
       <button class="cmdBtn" onclick="plRemove()">remove</button>
     </div>
     <div class="cmdLine" id="filesCmds" style="display: none;">
-      <button class="cmdBtn" onclick="fsReplQueue()">replace queue</button>
-      <button class="cmdBtn" onclick="fsAddToQueue()">add to queue</button>
       <button class="cmdBtn" onclick="fsAddToPlaylist()">add to playlist</button>
+      <button class="cmdBtn" onclick="fsAddToQueue()">add to queue</button>
+      <button class="cmdBtn" onclick="fsReplQueue()">replace queue</button>
     </div>
     <div class="cmdLine" id="streamsCmds" style="display: none;">
-      <button class="cmdBtn" onclick="stReplQueue()">play</button>
       <button class=" cmdBtn" onclick="stModify()">modify</button>
+      <button class="cmdBtn" onclick="stReplQueue()">play</button>
       <button class="cmdBtn" onclick="stRemove()">remove</button>
     </div>
     <div class="noGrowNoShrink justify" style="height: 50px;">
@@ -821,20 +821,6 @@
         mpdCmd('play', [queue.songs[liSelected[0]].Pos]);
       }
 
-      function quAddToPlaylist() {
-        showSelectPlaylist(quAddToPlaylistConfirm);
-      }
-
-      function quAddToPlaylistConfirm() {
-        let name = document.getElementById("plSelect").value;
-        if (name === '')
-          name = prompt("Enter playlist name");
-        if (name != null)
-          liSelected.map(el => mpdCmd('playlistadd', [name, encodeURIComponent(queue.songs[el].file)]));
-        hideSelectPlaylist();
-      }
-
-
       // PLAYLISTS
 
       var playlists = {};
@@ -882,6 +868,19 @@
       function plRemove() {
         liSelected.map(el => mpdCmd('rm', [playlists[el].playlist]));
         listPlaylists();
+      }
+
+      function quAddToPlaylist() {
+        showSelectPlaylist(quAddToPlaylistConfirm);
+      }
+
+      function quAddToPlaylistConfirm() {
+        let name = document.getElementById("plSelect").value;
+        if (name === '')
+          name = prompt("Enter playlist name");
+        if (name != null)
+          liSelected.map(el => mpdCmd('playlistadd', [name, encodeURIComponent(queue.songs[el].file)]));
+        hideSelectPlaylist();
       }
 
       // FILES
@@ -965,7 +964,11 @@
         toutFetch(`/stream`, 5000)
           .then(data => data.json())
           .then(data => {
-            streams = data;
+            streams = data.sort((a, b) => {
+              if (a.name < b.name) return -1;
+              if (a.name > b.name) return 1;
+              return 0;
+            });;
             if (streams.length) {
               let pl_content = '<ul class="tabCntList">';
               for ([idx, item] of streams.entries())
