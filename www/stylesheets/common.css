@@ -171,6 +171,18 @@ body {
     white-space: nowrap;
 }
 
+.tabCntTitle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-top: 1px solid #1b3252;
+    width: 100%;
+    margin-top: -1px;
+    margin-bottom: 3px;
+    padding-top: 2px;
+    font-size: medium;
+}
+
 .tabCntList {
     list-style-type: none;
     margin: 0;

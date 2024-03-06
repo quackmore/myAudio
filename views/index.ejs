@@ -102,6 +102,11 @@
       <li onclick="loadStreams()" id="streamsTab">Streams</li>
       <li onclick="loadPodcast()" id="podcastTab">Podcasts</li>
     </ul>
+    <div class="center tabCntTitle" id="listTitle" style="display: none;">
+      <label>Playlist</label>
+      <input type="text" id="plName">
+      <i class="fa-solid fa-undo" onclick="plModNameUndo()"></i>
+    </div>
     <div class="tabContent" id="tabCt">
     </div>
     <div class="cmdLine" id="plSelCmd" style="display: none;">
@@ -121,6 +126,11 @@
       <button class="cmdBtn" onclick="plReplQueue()">replace queue</button>
       <button class="cmdBtn" onclick="plModify()">modify</button>
       <button class="cmdBtn" onclick="plRemove()">remove</button>
+    </div>
+    <div class="cmdLine" id="playlistModifyCmds" style="display: none;">
+      <button class="cmdBtn" onclick="plModCancel()">cancel</button>
+      <button class="cmdBtn" onclick="plModSave()">save</button>
+      <button class="cmdBtn" onclick="plModRemove()">remove</button>
     </div>
     <div class="cmdLine" id="filesCmds" style="display: none;">
       <button class="cmdBtn" onclick="fsAddToPlaylist()">add to playlist</button>
@@ -621,6 +631,7 @@
       var selectedTab = null;
 
       function selectTab(tab) {
+        hidelistTitle();
         if (selectedTab) selectedTab.classList.remove("selected");
         selectedTab = document.getElementById(tab);
         selectedTab.classList.add("selected");
@@ -646,7 +657,7 @@
       }
 
       function showCmds() {
-        if (selectCmds) selectedCmds.style.display = "flex";
+        if (selectedCmds) selectedCmds.style.display = "flex";
         document.getElementById("cancel1").disabled = false;
         document.getElementById("cancel2").disabled = false;
         document.getElementById("cancel3").disabled = false;
@@ -654,7 +665,7 @@
       }
 
       function hideCmds() {
-        if (selectCmds) selectedCmds.style.display = "none";
+        if (selectedCmds) selectedCmds.style.display = "none";
         document.getElementById("cancel1").disabled = true;
         document.getElementById("cancel2").disabled = true;
         document.getElementById("cancel3").disabled = true;
@@ -669,7 +680,8 @@
       function initLiSelected() {
         multipleliSelect = false;
         for (item of liSelected) {
-          document.getElementById(`li_${item}`).style.backgroundColor = "transparent";
+          if (document.getElementById(`li_${item}`))
+            document.getElementById(`li_${item}`).style.backgroundColor = "transparent";
         }
         liSelected = [];
         hideCmds();
@@ -733,6 +745,13 @@
         document.getElementById("plSelCmd").style.display = "none";
       }
 
+      function showListTitle() {
+        document.getElementById("listTitle").style.display = "flex";
+      }
+
+      function hidelistTitle() {
+        document.getElementById("listTitle").style.display = "none";
+      }
       // QUEUE
 
       var queue = {};
@@ -861,8 +880,60 @@
         initLiSelected();
       }
 
+      var plModName = "";
+      var playlistSongs = {};
+
+      function showPlaylistContent() {
+        if (playlistSongs.length) {
+          let pl_content = '<ul class="tabCntList">';
+          playlistSongs.map((el, idx) => pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">${el.file}</li>`)
+          pl_content += "</ul>";
+          document.getElementById("tabCt").innerHTML = pl_content;
+        } else
+          document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+      }
+
       function plModify() {
-        alert("not implemented");
+        plModName = playlists[liSelected[0]].playlist;
+        selectCmds("playlistModifyCmds");
+        showCmds();
+        document.getElementById("plName").value = plModName;
+        showListTitle();
+        toutFetch(`/mpd/listinfo/listplaylist/${encodeURIComponent(plModName)}`, 5000)
+          .then(data => data.json())
+          .then(data => {
+            playlistSongs = data;
+            showPlaylistContent();
+          })
+          .catch(err => alert(err.message));
+      }
+
+      function plModNameUndo() {
+        document.getElementById("plName").value = plModName;
+      }
+
+      function plModCancel() {
+        hidelistTitle();
+        listPlaylists();
+      }
+
+      async function plModSave() {
+        try {
+          await mpdCmd("rm", [encodeURIComponent(plModName)]);
+          await playlistSongs.map(el => mpdCmd("playlistadd", [
+            encodeURIComponent(document.getElementById("plName").value),
+            encodeURIComponent(el.file)]));
+          listPlaylists();
+        }
+        catch (err) {
+          alert(err.message)
+        };
+      }
+
+      function plModRemove() {
+        liSelected.reverse();
+        liSelected.map(el => playlistSongs.splice(el, 1));
+        showPlaylistContent();
       }
 
       function plRemove() {
@@ -950,7 +1021,16 @@
       }
 
       function fsAddToPlaylist() {
-        alert("not implemented");
+        showSelectPlaylist(fsAddToPlaylistConfirm);
+      }
+
+      function fsAddToPlaylistConfirm() {
+        let name = document.getElementById("plSelect").value;
+        if (name === '')
+          name = prompt("Enter playlist name");
+        if (name != null)
+          liSelected.map(el => mpdCmd('playlistadd', [name, encodeURIComponent((curPath === "" ? curPath : curPath + '/') + (files[el].directory ? files[el].directory : files[el].file))]));
+        hideSelectPlaylist();
       }
 
       // STREAMS
