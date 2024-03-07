@@ -15,10 +15,9 @@
     <div class="fixedWidth">
       <div class="justify">
         <div class="left">
-          <select class="myselect" name="audioSel" id="outSel" onchange="refreshPlayerStatus()">
-            <option value="bt">Bluetooth</option>
-            <option value="spkrs">Speakers</option>
-          </select>
+          <span class="outSelect actBC" id="outSel" onclick="toggleOutput(this.innerText)"></span>
+          <i id="outSelI"></i>
+          </i>
           <div class="actC" id="outputSelect" onclick="outputSelect()"></div>
           <div class="left" id="btDevDesc" style="font-size: small"></div>
         </div>
@@ -188,14 +187,61 @@
 
       let inPrefs = JSON.parse(`<%-JSON.stringify(prefs)%>`);
 
+      // PERSISTENT CFG
+
+      function readCfg(onError) {
+        return toutFetch('/cfgFile', 5000)
+          .then(data => data.json())
+          .catch(err => {
+            if (onError) onError(err)
+          });
+      }
+
+      function saveCfg(cfg, onError) {
+        req = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cfg)
+        };
+        return toutFetch('/cfgFile', 5000, req)
+          .catch(err => {
+            if (onError) onError(err)
+          });
+      }
+
       // PLAYER
 
       var player = {};
 
+      function setOutput(output) {
+        if (output === 'Speakers') {
+          document.getElementById('outSel').innerText = 'Speakers';
+          document.getElementById('outSelI').className = 'fa-regular fa-volume-high';
+        } else {
+          document.getElementById('outSel').innerText = 'Bluetooth';
+          document.getElementById('outSelI').className = 'fa-regular fa-headphones';
+        }
+      }
+
+      async function toggleOutput(current) {
+        let newOutput = 'Speakers';
+        if (current === 'Speakers')
+          newOutput = 'Bluetooth';
+        setOutput(newOutput);
+        try {
+          let cfg = {};
+          cfg = await readCfg();
+          cfg.output = newOutput;
+          saveCfg(cfg);
+        }
+        catch (err) { alert(err.message) }
+      }
+
+
       const outputSelect = async () => {
         let req = "";
         let url = ""
-        if (document.getElementById('outSel').value === 'spkrs') {
+        if (document.getElementById('outSel').innerText === 'Speakers') {
           req = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -227,11 +273,16 @@
             await getBtStatus();
             await getBtDevices();
             await getMpdStatus();
-            document.getElementById('outSel').value = 'spkrs';
-            if (player.bt.Powered === 'yes') document.getElementById('outSel').value = 'bt';
+            let output = 'Speakers';
+            let cfg = {};
+            cfg = await readCfg();
+            if (cfg.output)
+              output = cfg.output;
+            setOutput(output);
+            // if (player.bt.Powered === 'yes') document.getElementById('outSel').value = 'bt';
             firstTime = false;
           }
-          if (document.getElementById('outSel').value === 'spkrs') {
+          if (document.getElementById('outSel').innerText === 'Speakers') {
             await getSpeakerStatus();
             updateSpeakers();
           } else {
@@ -442,7 +493,7 @@
       }
 
       const showBtDevices = () => {
-        if (document.getElementById('outSel').value === 'spkrs') {
+        if (document.getElementById('outSel').innerText === 'Speakers') {
           closeBtDevMod();
         }
         else {
@@ -547,7 +598,7 @@
       // VOLUME
 
       const volumeSet = async () => {
-        if (document.getElementById('outSel').value === 'spkrs') {
+        if (document.getElementById('outSel').innerText === 'Speakers') {
           return;
         } else {
           let dev = await findBTconnectedDev();
@@ -563,7 +614,7 @@
       }
 
       const showVolume = () => {
-        if (document.getElementById('outSel').value === 'spkrs') {
+        if (document.getElementById('outSel').innerText === 'Speakers') {
           return;
         } else {
           document.getElementById('volLevel').innerText = document.getElementById('volRange').value;
@@ -572,7 +623,7 @@
 
       const volumeInc = async () => {
         if (document.getElementById('volRange').disabled) return;
-        if (document.getElementById('outSel').value === 'spkrs') {
+        if (document.getElementById('outSel').innerText === 'Speakers') {
           return;
         } else {
           let dev = await findBTconnectedDev();
@@ -587,7 +638,7 @@
 
       const volumeDec = async () => {
         if (document.getElementById('volRange').disabled) return;
-        if (document.getElementById('outSel').value === 'spkrs') {
+        if (document.getElementById('outSel').innerText === 'Speakers') {
           return;
         } else {
           let dev = await findBTconnectedDev();
@@ -601,7 +652,7 @@
       }
 
       const volumeToggleMute = async () => {
-        if (document.getElementById('outSel').value === 'spkrs') {
+        if (document.getElementById('outSel').innerText === 'Speakers') {
           return;
         } else {
           let dev = await findBTconnectedDev();
