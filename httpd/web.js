@@ -4,6 +4,7 @@ const path = require('path');
 const morgan = require('morgan');
 
 const btRouter = require('../api/bt');
+const cfgFile = require('../api/cfgFile');
 const homeRouter = require('../api/home');
 const mpdRouter = require('../api/mpd');
 const streamRouter = require('../api/stream');
@@ -26,6 +27,7 @@ web.use(express.static('www'));
 
 web.use('/', homeRouter);
 web.use('/bt', btRouter);
+web.use('/cfgFile', cfgFile);
 web.use('/mpd', mpdRouter);
 web.use('/stream', streamRouter);
 
