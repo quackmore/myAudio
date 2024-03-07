@@ -11,6 +11,22 @@ body {
     padding: 10px;
 }
 
+.actC {
+    cursor: pointer;
+}
+
+.actBC {
+    cursor: pointer;
+}
+
+.actC:active {
+    color: blue;
+}
+
+.actBC:active {
+    background-color: blue;
+}
+
 .upBox {
     flex: 0 0 auto;
     border: 1px solid blue;
@@ -203,8 +219,8 @@ body {
     border: 0.5em solid transparent;
     /* border-color: #eee;
     border-top-color: rgb(197, 125, 18); */
-    border-color: rgb(238, 168, 63);
-    border-top-color: rgb(145, 72, 4);
+    border-color: rgb(12, 12, 68);
+    border-top-color: lightblue;
     border-radius: 50%;
     animation: loadingspin 1s linear infinite;
 }
@@ -218,7 +234,7 @@ body {
 .overlay {
     z-index: 10;
     position: absolute;
-    height: 60%;
+    height: 90%;
     /* width: 95%; */
     margin: 0;
     display: flex;

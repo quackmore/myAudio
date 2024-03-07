@@ -19,7 +19,7 @@
             <option value="bt">Bluetooth</option>
             <option value="spkrs">Speakers</option>
           </select>
-          <div id="outputSelect" onclick="outputSelect()"></div>
+          <div class="actC" id="outputSelect" onclick="outputSelect()"></div>
           <div class="left" id="btDevDesc" style="font-size: small"></div>
         </div>
       </div>
@@ -52,20 +52,21 @@
       </div>
       <div class="justify" style="padding-top: 10px;">
         <div class="justify" style="padding-left: 40px; padding-right: 40px;">
-          <i class="fa-solid fa-shuffle fa-xs" style="color: lightgray;" id="shuffle" onclick="toggleShuffle()"></i>
-          <i class="fa-solid fa-backward-step fa-sm" id="previous" onclick="mpdCmd('previous',[])"></i>
-          <i class="fa-solid fa-play fa-xl" id="play" onclick="togglePlay()"></i>
-          <i class="fa-solid fa-forward-step fa-sm" id="next" onclick="mpdCmd('next',[])"></i>
-          <i class="fa-solid fa-repeat fa-xs" style="color: lightgray;" id="repeat" onclick="toggleRepeat()"></i>
-          <i class="fa-solid fa-1 fa-xs" style="color: lightgray;" id="single" onclick="toggleSingle()"></i>
+          <i class="fa-solid fa-shuffle fa-xs actC" style="color: lightgray;" id="shuffle"
+            onclick="toggleShuffle()"></i>
+          <i class="fa-solid fa-backward-step fa-sm actC" id="previous" onclick="mpdCmd('previous',[])"></i>
+          <i class="fa-solid fa-play fa-xl actC" id="play" onclick="togglePlay()"></i>
+          <i class="fa-solid fa-forward-step fa-sm actC" id="next" onclick="mpdCmd('next',[])"></i>
+          <i class="fa-solid fa-repeat fa-xs actC" style="color: lightgray;" id="repeat" onclick="toggleRepeat()"></i>
+          <i class="fa-solid fa-1 fa-xs actC" style="color: lightgray;" id="single" onclick="toggleSingle()"></i>
         </div>
         <div class="right" style="padding-right: 20px;">
           <div class="left">
             <span id="volMute2" onclick="volumeToggleMute()">
-              <i class="fa-solid fa-volume-xmark"></i>
+              <i class="fa-solid fa-volume-xmark actC"></i>
             </span>
           </div>
-          <div class="right">
+          <div class="right actC">
             <span id="volLevel" onclick="openVolumeMod()">0</span>
           </div>
         </div>
@@ -75,19 +76,19 @@
           <div class="justify" style="padding: 20px; background-color: lightblue;">
             <div class=" left">
               <span id="volMute" onclick="volumeToggleMute()">
-                <i class="fa-solid fa-volume-xmark"></i>
+                <i class="fa-solid fa-volume-xmark actBC"></i>
               </span>
-              <i id="volMinus" class="fa-solid fa-minus" onclick="volumeDec()"></i>
+              <i id="volMinus" class="fa-solid fa-minus actBC" onclick="volumeDec()"></i>
             </div>
             <div class="volSlider">
               <input type="range" min="1" max="100" value="0" class="slider" id="volRange" disabled
                 onchange="volumeSet()" oninput="showVolume()">
             </div>
             <div class="right">
-              <i id="volPlus" class="fa-solid fa-plus" onclick="volumeInc()"></i>
+              <i id="volPlus" class="fa-solid fa-plus actBC" onclick="volumeInc()"></i>
             </div>
             <div class="right">
-              <i onclick="closeVolumeMod()" class="fa-regular fa-xmark"></i>
+              <i onclick="closeVolumeMod()" class="fa-regular fa-xmark actBC"></i>
             </div>
           </div>
         </div>
@@ -105,7 +106,7 @@
     <div class="center tabCntTitle" id="listTitle" style="display: none;">
       <label>Playlist</label>
       <input type="text" id="plName">
-      <i class="fa-solid fa-undo" onclick="plModNameUndo()"></i>
+      <i class="fa-solid fa-undo actBC" onclick="plModNameUndo()"></i>
     </div>
     <div class="tabContent" id="tabCt">
     </div>
@@ -274,7 +275,7 @@
         document.getElementById('volRange').value = 0;
         document.getElementById('volRange').disabled = true;
         document.getElementById('volLevel').innerText = 0;
-        document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+        document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark actC"></i>';
       }
 
       // MPD PLAYER
@@ -376,7 +377,7 @@
         document.getElementById('song').innerHTML = "-";
         document.getElementById('duration').innerText = "";
         document.getElementById('elapsed').value = 0;
-        document.getElementById('play').className = "fa-solid fa-play fa-xl";
+        document.getElementById('play').className = "fa-solid fa-play fa-xl actC";
       }
 
       const updateMpdPlayer = () => {
@@ -416,11 +417,11 @@
           else
             document.getElementById('single').style.color = 'lightgray';
           if (player.mpd.status.state === 'play') {
-            document.getElementById('play').className = "fa-solid fa-pause fa-xl";
+            document.getElementById('play').className = "fa-solid fa-pause fa-xl actC";
             refreshElapsed();
             setUpdateElapsed(1000);
           } else {
-            document.getElementById('play').className = "fa-solid fa-play fa-xl";
+            document.getElementById('play').className = "fa-solid fa-play fa-xl actC";
             setUpdateElapsed(0);
           }
         }
@@ -528,8 +529,8 @@
             document.getElementById('volRange').disabled = false;
           }
           if (player.bt.devices[connectedDev].mute) {
-            document.getElementById('volMute').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark"></i>' : '<i class="fa-solid fa-volume-high"></i>';
-            document.getElementById('volMute2').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark"></i>' : '<i class="fa-solid fa-volume-high"></i>';
+            document.getElementById('volMute').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
+            document.getElementById('volMute2').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
           }
         }
         else {
@@ -538,8 +539,8 @@
           document.getElementById('volRange').value = 0;
           document.getElementById('volRange').disabled = true;
           document.getElementById('volLevel').innerText = 0;
-          document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
-          document.getElementById('volMute2').innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+          document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark actC"></i>';
+          document.getElementById('volMute2').innerHTML = '<i class="fa-solid fa-volume-xmark actC"></i>';
         }
       }
 
