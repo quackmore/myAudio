@@ -1,0 +1,14 @@
+{
+    "name": "MyAudio",
+    "short_name": "MyAudio",
+    "display": "standalone",
+    "scope": "./",
+    "start_url": "./",
+    "icons": [
+        {
+            "src": "/images/favicon.png",
+            "sizes": "180x180",
+            "type": "image/png"
+        }
+    ]
+}
