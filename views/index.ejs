@@ -237,24 +237,17 @@
         catch (err) { alert(err.message) }
       }
 
-
       const outputSelect = async () => {
         let req = "";
         let url = ""
-        if (document.getElementById('outSel').innerText === 'Speakers') {
-          req = {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: `{"aux_contacts_status": "${player.speakers.speakerOn === 'on' ? "open" : "closed"}"}`
-          };
-          url = `http://${player.speakers.contactDevice}/auxContactsStatus?${new URLSearchParams({ "id": player.speakers.contactRelay })}`;
-        } else {
-          req = {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          };
+        req = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        };
+        if (document.getElementById('outSel').innerText === 'Speakers')
+          url = `/speakers/toggle`;
+        else
           url = `/bt/status/power/${player.bt.Powered === 'yes' ? 'off' : 'on'}`;
-        }
         try {
           await toutFetch(url, 5000, req);
           refreshPlayerStatus();
@@ -279,7 +272,6 @@
             if (cfg.output)
               output = cfg.output;
             setOutput(output);
-            // if (player.bt.Powered === 'yes') document.getElementById('outSel').value = 'bt';
             firstTime = false;
           }
           if (document.getElementById('outSel').innerText === 'Speakers') {
@@ -310,23 +302,24 @@
       // SPEAKERS
 
       player.speakers = {};
-      player.speakers.contactDevice = inPrefs.audioContactDev;
-      player.speakers.contactRelay = +inPrefs.audioContactRel;
 
       const getSpeakerStatus = () => {
-        return toutFetch(`http://${player.speakers.contactDevice}/auxContactsStatus`, 5000)
+        return toutFetch('/speakers/status', 5000)
           .then(res => res.json())
-          .then(data => player.speakers.speakerOn = (data.aux_contacts_status[player.speakers.contactRelay] === 'closed' ? 'on' : 'off'))
+          .then(data => player.speakers = data)
       }
 
       const updateSpeakers = () => {
         if (!player.speakers) return;
         document.getElementById('outputSelect').innerHTML = (player.speakers.speakerOn === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
         document.getElementById('btDevDesc').innerHTML = "";
-        document.getElementById('volRange').value = 0;
-        document.getElementById('volRange').disabled = true;
-        document.getElementById('volLevel').innerText = 0;
-        document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark actC"></i>';
+        document.getElementById('volRange').value = player.speakers.volume.split("%")[0];
+        document.getElementById('volRange').disabled = false;
+        document.getElementById('volLevel').innerText = player.speakers.volume.split("%")[0];
+        if (player.speakers.mute) {
+          document.getElementById('volMute').innerHTML = player.speakers.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
+          document.getElementById('volMute2').innerHTML = player.speakers.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
+        };
       }
 
       // MPD PLAYER
@@ -598,12 +591,17 @@
       // VOLUME
 
       const volumeSet = async () => {
+        let vol = document.getElementById('volRange').value;
         if (document.getElementById('outSel').innerText === 'Speakers') {
-          return;
+          if (`${vol}%` !== player.speakers.volume)
+            toutFetch(`/speakers/volume/set/${vol}%25`, 60000, {
+              method: 'POST'
+            })
+              .then(() => refreshPlayerStatus())
+              .catch((err) => alert(`Failed to set speakers volume to ${vol} - ${err.message}`));
         } else {
           let dev = await findBTconnectedDev();
           if (Object.keys(dev).length === 0) return;
-          let vol = document.getElementById('volRange').value;
           if (`${vol}%` !== dev.volume)
             toutFetch(`/bt/volume/set/${dev.address}/${vol}%25`, 60000, {
               method: 'POST'
@@ -614,17 +612,17 @@
       }
 
       const showVolume = () => {
-        if (document.getElementById('outSel').innerText === 'Speakers') {
-          return;
-        } else {
-          document.getElementById('volLevel').innerText = document.getElementById('volRange').value;
-        }
+        document.getElementById('volLevel').innerText = document.getElementById('volRange').value;
       }
 
       const volumeInc = async () => {
         if (document.getElementById('volRange').disabled) return;
         if (document.getElementById('outSel').innerText === 'Speakers') {
-          return;
+          toutFetch(`/speakers/volume/inc`, 60000, {
+            method: 'POST'
+          })
+            .then(() => refreshPlayerStatus())
+            .catch((err) => alert(`Failed to increment speakers volume - ${err.message}`));
         } else {
           let dev = await findBTconnectedDev();
           if (Object.keys(dev).length === 0) return;
@@ -639,7 +637,11 @@
       const volumeDec = async () => {
         if (document.getElementById('volRange').disabled) return;
         if (document.getElementById('outSel').innerText === 'Speakers') {
-          return;
+          toutFetch(`/speakers/volume/dec`, 60000, {
+            method: 'POST'
+          })
+            .then(() => refreshPlayerStatus())
+            .catch((err) => alert(`Failed to increment speakers volume - ${err.message}`));
         } else {
           let dev = await findBTconnectedDev();
           if (Object.keys(dev).length === 0) return;
@@ -653,7 +655,12 @@
 
       const volumeToggleMute = async () => {
         if (document.getElementById('outSel').innerText === 'Speakers') {
-          return;
+          if (player.speakers.mute)
+            toutFetch(`/speakers/volume/set/${player.speakers.mute === "yes" ? "unmute" : "mute"}`, 60000, {
+              method: 'POST'
+            })
+              .then(() => refreshPlayerStatus())
+              .catch((err) => alert(`Failed to set speakers volume to [mute|unmute] - ${err.message}`));
         } else {
           let dev = await findBTconnectedDev();
           if (Object.keys(dev).length === 0) return;
@@ -662,7 +669,7 @@
               method: 'POST'
             })
               .then(() => refreshPlayerStatus())
-              .catch((err) => alert(`Failed to set ${dev.name} volume to ${vol} - ${err.message}`));
+              .catch((err) => alert(`Failed to set ${dev.name} volume to [mute|unmute] - ${err.message}`));
         }
       }
 
@@ -924,7 +931,7 @@
         mpdCmd('clear', [])
           .then(() => liSelected.map(el => mpdCmd('load', [playlists[el].playlist])))
           .catch(err => alert(err.message))
-          .finally(() => initLiSelected());
+          .finally(() => loadQueue());
       }
 
       function plAddToQueue() {
@@ -1064,7 +1071,7 @@
         mpdCmd('clear', [])
           .then(() => liSelected.map(el => mpdCmd('add', [encodeURIComponent((curPath === "" ? curPath : curPath + '/') + (files[el].directory ? files[el].directory : files[el].file))])))
           .catch(err => alert(err.message))
-          .finally(() => initLiSelected());
+          .finally(() => loadQueue());
       }
 
       function fsAddToQueue() {
@@ -1129,7 +1136,7 @@
           .then(() => mpdCmd('play', []))
           .then(() => toutFetch(`/stream/deleteStreamingPlaylist`, 5000, { method: 'POST' }))
           .catch(err => alert(err.message))
-          .finally(() => initLiSelected());
+          .finally(() => loadQueue());
       }
 
       function stModify() {
@@ -1138,6 +1145,16 @@
 
       function stRemove() {
         alert("not implemented");
+      }
+
+      // PODCAST
+
+      const loadPodcast = async () => {
+        selectTab("podcastTab");
+        // selectFN("streamsFn");
+        // selectCmds("streamsCmds");
+        // toutFetch(`/podcast`, 5000)
+        //   .catch(err => alert(err.message));
       }
 
       // STARTUP
