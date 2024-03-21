@@ -17,8 +17,7 @@
         <div class="left">
           <span class="outSelect actBC" id="outSel" onclick="toggleOutput(this.innerText)"></span>
           <i id="outSelI"></i>
-          </i>
-          <div class="actC" id="outputSelect" onclick="outputSelect()"></div>
+          <div class="actC" id="outputSwitch" onclick="outputSwitch()"></div>
           <div class="left" id="btDevDesc" style="font-size: small"></div>
         </div>
       </div>
@@ -233,11 +232,12 @@
           cfg = await readCfg();
           cfg.output = newOutput;
           saveCfg(cfg);
+          refreshPlayerStatus();
         }
         catch (err) { alert(err.message) }
       }
 
-      const outputSelect = async () => {
+      async function outputSwitch() {
         let req = "";
         let url = ""
         req = {
@@ -311,7 +311,7 @@
 
       const updateSpeakers = () => {
         if (!player.speakers) return;
-        document.getElementById('outputSelect').innerHTML = (player.speakers.speakerOn === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
+        document.getElementById('outputSwitch').innerHTML = (player.speakers.speakerOn === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
         document.getElementById('btDevDesc').innerHTML = "";
         document.getElementById('volRange').value = player.speakers.volume.split("%")[0];
         document.getElementById('volRange').disabled = false;
@@ -556,7 +556,7 @@
 
       const updateBT = () => {
         if (!player.bt) return;
-        document.getElementById('outputSelect').innerHTML = (player.bt.Powered === 'yes' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
+        document.getElementById('outputSwitch').innerHTML = (player.bt.Powered === 'yes' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
         let btDevList = document.getElementById('btDevList');
         btDevList.innerHTML = "";
         let connectedDev = -1;
