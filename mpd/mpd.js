@@ -35,7 +35,7 @@ function parseArrayOfObj(txt) {
 
 var client = null;
 
-const updateStatus = () => {
+function updateStatus() {
   return new Promise((resolve, reject) => {
     if (!mpdSt.online)
       resolve(mpdSt);
@@ -60,7 +60,7 @@ const updateStatus = () => {
   });
 }
 
-const playCmd = (command, options) => {
+function playCmd(command, options) {
   return new Promise((resolve, reject) => {
     if (!mpdSt.online) reject(new Error("mpd offline"));
     client.sendCommand(cmd(command, options), (err, msg) => {
@@ -73,7 +73,7 @@ const playCmd = (command, options) => {
   })
 }
 
-const listinfo = (info, options) => {
+async function listinfo(info, options) {
   return playCmd(info, options)
     .then(data => parseArrayOfObj(data))
     .catch(err => { throw new Error(err.message) });
@@ -146,6 +146,8 @@ async function start() {
 }
 
 async function end() {
+  // stop playing will clean stream cache avoiding issues on next restart
+  await playCmd('stop', []);
   log.info("ending mpd...");
   let mpdCmd = spawn("mpd", ["--kill"]);
   data = "";
