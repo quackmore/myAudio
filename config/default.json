@@ -13,7 +13,9 @@
         "contactRelay": 2,
         "alsaCfg": "/home/flintheart/.asoundrc",
         "streamsFile": "/home/flintheart/Music/streams/streams.json",
-        "streamingPlaylist": "/home/flintheart/.config/mpd/streaming.m3u"
+        "streamingPlaylist": "/home/flintheart/.config/mpd/streaming.m3u",
+        "streamingReconnectTimeout": 2000,
+        "streamingReconnectCount": 5
     },
     "logger": {
         "console_log": "ON",

@@ -9,7 +9,9 @@
     "player": {
         "alsaCfgFile": "/home/flintheart/.asoundrc",
         "streamsFile": "/home/flintheart/Music/streams/streams.json",
-        "streamingPlaylist": "/home/flintheart/.config/mpd/playlists/streaming.m3u"
+        "streamingPlaylist": "/home/flintheart/.config/mpd/playlists/streaming.m3u",
+        "streamingReconnectTimeout": 2000,
+        "streamingReconnectCount": 5
     },
     "speakers": {
         "contactDevice": "192.168.1.185",

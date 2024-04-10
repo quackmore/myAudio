@@ -3,6 +3,7 @@ const cmd = mpd.cmd;
 const { resolve } = require('path');
 const log = require('../logger');
 const { spawn } = require("child_process");
+const cfg = require('config');
 
 var mpdSt = {};
 
@@ -42,13 +43,13 @@ function updateStatus() {
     else
       client.sendCommand(cmd("status", []), (err, msg) => {
         if (err) {
-          log.error(err);
+          log.error(err.message);
           reject(err);
         } else {
           mpdSt.status = parseObj(msg);
           client.sendCommand(cmd("currentsong", []), (err, msg) => {
             if (err) {
-              log.error(err);
+              log.error(err.message);
               reject(err);
             } else {
               mpdSt.curSong = parseObj(msg);
@@ -115,8 +116,41 @@ function connect() {
     log.info(`update ${name}`);
   });
 
+
+  var streamPlayRetry = 0;
+
+  function streamPlay() {
+    playCmd('play', []);
+  }
+
   client.on('system-player', () => {
-    updateStatus();
+    updateStatus()
+      .then(() => {
+        if (mpdSt.status) {
+          // on streaming pause stop the player (clean the cache)
+          if (mpdSt.curSong.file.startsWith('http')
+            && mpdSt.status.state === 'pause') {
+            playCmd('stop', []);
+          }
+          // on streaming errors retry connection
+          if (mpdSt.status.error) {
+            log.error(mpdSt.status.error);
+            if (mpdSt.curSong.file.startsWith('http')
+              && mpdSt.status.state === 'stop') {
+              if (streamPlayRetry < cfg.get('player.streamingReconnectCount')) {
+                streamPlayRetry++;
+                log.info(`will try to reconnect [${streamPlayRetry}] to stream in ${cfg.get('player.streamingReconnectTimeout') / 1000} secs...`);
+                setTimeout(streamPlay, cfg.get('player.streamingReconnectTimeout'));
+              }
+            }
+          }
+          // on streaming playing
+          if (mpdSt.curSong.file.startsWith('http')
+            && mpdSt.status.state === 'play') {
+            streamPlayRetry = 0;
+          }
+        }
+      });
   });
 }
 
