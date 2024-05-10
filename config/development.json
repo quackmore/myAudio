@@ -14,7 +14,7 @@
         "streamingReconnectCount": 5
     },
     "speakers": {
-        "contactDevice": "192.168.1.185",
+        "contactDevice": "192.168.1.211",
         "contactRelay": 2,
         "card": "2",
         "volumeCtrl": "PCM"
