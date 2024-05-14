@@ -44,7 +44,7 @@
       <div class="center" style="gap: 10px;">
         <div class="left" style="width: 60%;">
           <input type="range" min="1" max="100" value="0" class="slider" id="elapsed" onchange="setPosition(this.value)"
-            onmousedown="setUpdateElapsed(0);" onmouseup="setUpdateElapsed(1000);">
+            onpointerdown="setUpdateElapsed(0);" onpointerup="setUpdateElapsed(1000);">
         </div>
         <span class="right" style="font-size: small;" id="duration"> </span>
       </div>
@@ -851,7 +851,7 @@
                 if (parseFloat(item.duration))
                   queue.duration += parseFloat(item.duration);
                 let qline = getQueueDes(item);
-                pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
+                pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
               }
               // DEBUG
               // console.log(queue);
@@ -918,7 +918,7 @@
             if (playlists.length) {
               let pl_content = '<ul class="tabCntList">';
               for ([idx, item] of playlists.entries())
-                pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">${item.playlist}</li>`;
+                pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${item.playlist}</li>`;
               pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
             } else
@@ -945,7 +945,7 @@
       function showPlaylistContent() {
         if (playlistSongs.length) {
           let pl_content = '<ul class="tabCntList">';
-          playlistSongs.map((el, idx) => pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">${el.file}</li>`)
+          playlistSongs.map((el, idx) => pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${el.file}</li>`)
           pl_content += "</ul>";
           document.getElementById("tabCt").innerHTML = pl_content;
         } else
@@ -1038,9 +1038,9 @@
               let pl_content = '<ul class="tabCntList">';
               for ([idx, item] of files.entries()) {
                 if (item.directory)
-                  pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}"><button onclick="enterDir('${item.directory}')">${item.directory}</button></li>`;
+                  pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}"><button onclick="enterDir('${item.directory}')">${item.directory}</button></li>`;
                 if (item.file)
-                  pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">${item.file}</li>`;
+                  pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${item.file}</li>`;
               }
               pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
@@ -1111,7 +1111,7 @@
             if (streams.length) {
               let pl_content = '<ul class="tabCntList">';
               for ([idx, item] of streams.entries())
-                pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" id="li_${idx}">${item.name} - <small><i>${item.location}</i></small></li>`;
+                pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${item.name} - <small><i>${item.location}</i></small></li>`;
               pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
             } else
