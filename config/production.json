@@ -7,6 +7,7 @@
         "log_path": "/var/log/production"
     },
     "player": {
+        "bt_output": "bth-speaker",
         "alsaCfgFile": "/home/flintheart/.asoundrc",
         "streamsFile": "/home/flintheart/Music/streams/streams.json",
         "streamingPlaylist": "/home/flintheart/.config/mpd/playlists/streaming.m3u",

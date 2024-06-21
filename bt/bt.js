@@ -11,6 +11,7 @@ var bth = {};
 
 bth.interval = null;
 bth.intCnt = 0;
+bth.output = 'disabled';
 bth.status = {};
 bth.status.connected = null;
 bth.scan_status = {
@@ -816,7 +817,10 @@ const refreshBtInfo = async () => {
     } else {
       await bluetoothctlInfoDevice();
       if (findConnectedDevice() === null) {
-        // MPD OUTPUT
+        if (bth.output === 'enabled' && cfg.has('player.bt_output')) {
+          mpd.output(['disableoutput', cfg.get('player.bt_output')]);
+          bth.output = 'disabled'
+        }
         if (!prevState.connecting) {
           await statusChange(['scan', 'on']);
           prevState.connecting = true;
@@ -837,7 +841,10 @@ const refreshBtInfo = async () => {
           await saveLastDeviceConnected(bth.status.connected.address);
           await amixerSconctrols();
           await setDefaultVolume(bth.status.connected.address);
-          // MPD OUTPUT
+          if (bth.output === 'disabled' && cfg.has('player.bt_output')) {
+            mpd.output(['enableoutput', cfg.get('player.bt_output')]);
+            bth.output = 'enabled'
+          }
           prevState.connectedCnt++;
         }
         if (prevState.connectedCnt > 2) {

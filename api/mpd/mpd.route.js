@@ -33,4 +33,17 @@ router.get('/listinfo/:info/:uri?', async function (req, res, next) {
     .catch(err => res.status(500).send(err.message));
 });
 
+router.post('/output/:opt1?/:opt2?', async function (req, res, next) {
+  let options = [];
+  if (req.params.opt1) options.push(req.params.opt1);
+  if (req.params.opt2) options.push(req.params.opt2);
+  try {
+    let msg = await mpd.output(options);
+    res.json(msg);
+  }
+  catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 module.exports = router;

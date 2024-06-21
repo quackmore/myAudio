@@ -15,6 +15,8 @@ mpd.start();
 process.on('SIGINT', async () => {
     httpd.closeAllConnections();
     httpd.close();
+    if (config.has('player.bt_output'))
+        mpd.output(['disableoutput', config.get('player.bt_output')]);
     await mpd.end();
     log.info(`${packageJSON.name} ended`);
     log.end();

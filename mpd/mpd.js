@@ -22,7 +22,7 @@ function parseArrayOfObj(txt) {
   let song = {};
   for (item of txt.split('\n')) {
     if (item === '') continue;
-    if ((item.startsWith('file') || item.startsWith('directory') || item.startsWith('playlist')) && Object.keys(song).length !== 0) {
+    if ((item.startsWith('file') || item.startsWith('directory') || item.startsWith('playlist') || item.startsWith('outputid')) && Object.keys(song).length !== 0) {
       array.push(song);
       song = {};
     }
@@ -78,6 +78,30 @@ async function listinfo(info, options) {
   return playCmd(info, options)
     .then(data => parseArrayOfObj(data))
     .catch(err => { throw new Error(err.message) });
+}
+
+async function output(options) {
+  try {
+    let data = await playCmd('outputs', []);
+    outputs = parseArrayOfObj(data);
+    if (options.length == 0)
+      return outputs;
+    switch (options[0]) {
+      case 'disableoutput': {
+        await playCmd('disableoutput', [outputs.find(el => el.outputname === options[1]).outputid]);
+        let data = await playCmd('outputs', []);
+        return parseArrayOfObj(data);
+      }
+      case 'enableoutput': {
+        await playCmd('enableoutput', [outputs.find(el => el.outputname === options[1]).outputid]);
+        let data = await playCmd('outputs', []);
+        return parseArrayOfObj(data);
+      }
+      default: throw new Error(`unknown command ${options[0]}`);
+    }
+  } catch (err) {
+    throw new Error(err.message);
+  }
 }
 
 let reconnectCount = 0;
@@ -231,5 +255,6 @@ module.exports = {
   listinfo: listinfo,
   start: start,
   end: end,
-  restart: restart
+  restart: restart,
+  output: output
 }

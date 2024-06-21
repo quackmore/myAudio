@@ -9,6 +9,7 @@
         "port": 3000
     },
     "player": {
+        "bt_output": "bth-speaker",
         "contactDevice": "192.168.1.211",
         "contactRelay": 2,
         "alsaCfg": "/home/flintheart/.asoundrc",
