@@ -18,6 +18,13 @@ bth.scan_status = {
   inProgress: false
 };
 
+const devName = (dev) => {
+  if (dev == undefined)
+    return `${bth.status.connected.hasOwnProperty('name') ? bth.status.connected.name : bth.status.connected.address}`;
+  else
+    return `${dev.hasOwnProperty('name') ? dev.name : dev.address}`;
+}
+
 const saveVolume = (value) => {
   if (!(bth.status.connected.hasOwnProperty('address'))) return;
   let content = cfgfile.read();
@@ -53,11 +60,11 @@ const volumeInc = async () => {
     let volCtrl = "";
     let volLev = "";
     if (bth.status.connected == null) {
-      reject("no connected device");
+      reject("no devices connected");
       return;
     } else {
       if (!(bth.status.connected.hasOwnProperty('volCtrl'))) {
-        reject("cannot find A2DP control");
+        reject(`${devName()} has no A2DP control`);
         return;
       }
       volCtrl = bth.status.connected.volCtrl;
@@ -79,7 +86,7 @@ const volumeInc = async () => {
       });
 
       if (exitCode) {
-        let msg = `amixer -D bluealsa sset ${volCtrlStr} 1%+ got ${data} - ${error}`;
+        let msg = `<amixer -D bluealsa sset ${volCtrlStr} 1%+> got ${data} - ${error}`;
         log.error(msg);
         reject(msg);
         return;
@@ -88,7 +95,7 @@ const volumeInc = async () => {
       // save default volume value
       saveVolumeInc(1);
     }
-    resolve(`${bth.status.connected.name}'s volume increased by 1%`);
+    resolve(`${devName()}'s volume increased by 1%`);
   })
 }
 
@@ -97,11 +104,11 @@ const volumeDec = async () => {
     let volCtrl = "";
     let volLev = "";
     if (bth.status.connected == null) {
-      reject("no connected device");
+      reject("no devices connected");
       return;
     } else {
       if (!(bth.status.connected.hasOwnProperty('volCtrl'))) {
-        reject("cannot find A2DP control");
+        reject(`${devName()} has no A2DP control`);
         return;
       }
       volCtrl = bth.status.connected.volCtrl;
@@ -123,7 +130,7 @@ const volumeDec = async () => {
       });
 
       if (exitCode) {
-        let msg = `amixer -D bluealsa sset ${volCtrlStr} 1%- got ${data} - ${error}`;
+        let msg = `<amixer -D bluealsa sset ${volCtrlStr} 1%-> got ${data} - ${error}`;
         log.error(msg);
         reject(msg);
         return;
@@ -132,7 +139,7 @@ const volumeDec = async () => {
       // save default volume value
       saveVolumeInc(-1);
     }
-    resolve(`${bth.status.connected.name}'s volume decreased by 1%`);
+    resolve(`${devName()}'s volume decreased by 1%`);
   })
 }
 
@@ -141,11 +148,11 @@ const volumeSet = async (value) => {
     let volCtrl = "";
     let volLev = "";
     if (bth.status.connected == null) {
-      reject("no connected device");
+      reject("no device connected");
       return;
     } else {
       if (!(bth.status.connected.hasOwnProperty('volCtrl'))) {
-        reject("cannot find A2DP control");
+        reject(`${devName()} has no A2DP control`);
         return;
       }
       volCtrl = bth.status.connected.volCtrl;
@@ -169,7 +176,7 @@ const volumeSet = async (value) => {
       });
 
       if (exitCode) {
-        let msg = `amixer -D bluealsa sset ${volCtrlStr} ${value} got ${data} - ${error}`;
+        let msg = `<amixer -D bluealsa sset ${volCtrlStr} ${value}> got ${data} - ${error}`;
         log.error(msg);
         reject(msg);
         return;
@@ -201,7 +208,7 @@ const volumeSet = async (value) => {
         });
 
         if (exitCode) {
-          let msg = `amixer -D bluealsa sset ${volCtrlStr} ${value} got ${data} - ${error}`;
+          let msg = `<amixer -D bluealsa sset ${volCtrlStr} ${value}> got ${data} - ${error}`;
           log.error(msg);
           reject(msg);
           return;
@@ -223,7 +230,7 @@ const volumeSet = async (value) => {
           });
 
           if (exitCode) {
-            let msg = `amixer -D bluealsa sset ${volCtrlStr} ${value} got ${data} - ${error}`;
+            let msg = `<amixer -D bluealsa sset ${volCtrlStr} ${value}> got ${data} - ${error}`;
             log.error(msg);
             reject(msg);
             return;
@@ -234,7 +241,7 @@ const volumeSet = async (value) => {
       // save default volume value
       saveVolume(value);
     }
-    resolve(`${bth.status.connected.name}'s volume set to ${value}`);
+    resolve(`${devName()}'s volume set to ${value}`);
   })
 }
 
@@ -242,17 +249,17 @@ const volumeMute = async (val) => {
   return new Promise(async (resolve, reject) => {
     // val = "mute" || "unmute"
     if (val !== "mute" && val !== "unmute") {
-      reject("invalid command");
+      reject(`invalid command ${val}`);
       return;
     }
     let volCtrl = "";
     let volLev = "";
     if (bth.status.connected == null) {
-      reject("no connected device");
+      reject("no devices connected");
       return;
     } else {
       if (!(bth.status.connected.hasOwnProperty('volCtrl'))) {
-        reject("cannot find A2DP control");
+        reject(`${devName()} has no A2DP control`);
         return;
       }
       volCtrl = bth.status.connected.volCtrl;
@@ -273,14 +280,14 @@ const volumeMute = async (val) => {
       });
 
       if (exitCode) {
-        let msg = `amixer -D bluealsa sset ${volCtrlStr} [mute|unmute] got ${data} - ${error}`;
+        let msg = `<amixer -D bluealsa sset ${volCtrlStr} [mute|unmute]> got ${data} - ${error}`;
         log.error(msg);
         reject(msg);
         return;
       }
       await amixerSconctrols();
     }
-    resolve(`${bth.status.connected.name}'s volume ${val}d`);
+    resolve(`${devName()}'s volume ${val}d`);
   })
 }
 
@@ -311,7 +318,7 @@ const deviceConnect = async (address) => {
           bthCmd.on('close', resolve);
         });
         if (exitCode) {
-          let msg = `attempting to disconnect ${dev.address} got ${data} - ${error}`;
+          let msg = `<bluetoothctl disconnect ${dev.address}> got ${data} - ${error}`;
           log.error(msg);
           reject(msg);
           return;
@@ -319,11 +326,11 @@ const deviceConnect = async (address) => {
       }
     }
     if (Object.keys(foundDev).length === 0) {
-      reject("invalid address");
+      reject(`no devices with address ${address}`);
       return;
     }
     if (foundDev.connected === "yes") {
-      resolve("already connected");
+      resolve(`${devName(foundDev)} [${foundDev.address}] already connected`);
       return;
     }
     // trust device
@@ -342,7 +349,7 @@ const deviceConnect = async (address) => {
       });
 
       if (exitCode) {
-        let msg = `attempting to trust ${address} got ${data} - ${error}`;
+        let msg = `<bluetoothctl trust ${address}> got ${data} - ${error}`;
         log.error(msg);
         reject(msg);
         return;
@@ -364,7 +371,7 @@ const deviceConnect = async (address) => {
       });
 
       if (exitCode) {
-        let msg = `attempting to pair ${address} got ${data} - ${error}`;
+        let msg = `<bluetoothctl pair ${address}> got ${data} - ${error}`;
         log.error(msg);
         reject(msg);
         return;
@@ -372,7 +379,7 @@ const deviceConnect = async (address) => {
     }
     // connect device
     if (foundDev.online == undefined || foundDev.online === 'no') {
-      reject("device is offline");
+      reject(`${devName(foundDev)} [${foundDev.address}] is offline`);
       return;
     }
     // log.info(`finally connecting to ${address}`);
@@ -389,12 +396,12 @@ const deviceConnect = async (address) => {
     });
 
     if (exitCode) {
-      let msg = `attempting to connect ${address} got ${data} - ${error}`;
+      let msg = `<bluetooth connect ${address}> got ${data} - ${error}`;
       log.error(msg);
       reject(msg);
       return;
     }
-    resolve("connected");
+    resolve(`${devName(foundDev)} ? foundDev.name : ""} [${foundDev.address}] connected`);
   })
 }
 
@@ -469,7 +476,7 @@ const statusChange = ([attr, state]) => {
     });
 
     if (exitCode) {
-      let msg = `bluetoothctl ${attr} ${state} got ${data} - ${error}`;
+      let msg = `<bluetoothctl ${attr} ${state}> got ${data} - ${error}`;
       log.error(msg);
       reject(msg);
       return;
@@ -483,7 +490,7 @@ const statusChange = ([attr, state]) => {
 const amixerSconctrols = () => {
   return new Promise(async (resolve, reject) => {
     if (bth.status.connected == null) {
-      reject("no connected device");
+      reject("no devices connected");
       return;
     }
     bthCmd = spawn("amixer", ["-D", "bluealsa", "scontrols"]);
@@ -505,7 +512,7 @@ const amixerSconctrols = () => {
     });
 
     if (exitCode) {
-      let msg = `amixer -D bluealsa scontrols got ${data} - ${error}`;
+      let msg = `<amixer -D bluealsa scontrols> got ${data} - ${error}`;
       log.error(msg);
       reject(msg);
       return;
@@ -533,7 +540,7 @@ const amixerSconctrols = () => {
       });
 
       if (exitCode) {
-        let msg = `amixer -D bluealsa sget '${bth.status.connected.batCtrl}' got ${data} - ${error}`;
+        let msg = `<amixer -D bluealsa sget '${bth.status.connected.batCtrl}'> got ${data} - ${error}`;
         log.error(msg);
         reject(msg);
         return;
@@ -564,7 +571,7 @@ const amixerSconctrols = () => {
         });
 
         if (exitCode) {
-          let msg = `amixer -D bluealsa sget '${bth.status.connected.volCtrl}' got ${data} - ${error}`;
+          let msg = `<amixer -D bluealsa sget '${bth.status.connected.volCtrl}'> got ${data} - ${error}`;
           log.error(msg);
           reject(msg);
         }
@@ -580,7 +587,7 @@ const deviceRemove = async (address) => {
     for (dev of bth.status.devices)
       if (dev.address === address) found = true;
     if (!found) {
-      reject("invalid address");
+      reject(`no devices with address ${foundDev.address}`);
       return;
     }
     let bthCmd = spawn("bluetoothctl", ["remove", address]);
@@ -596,12 +603,12 @@ const deviceRemove = async (address) => {
     });
 
     if (exitCode) {
-      let msg = `bluetoothctl remove ${address} got ${data} - ${error}`;
+      let msg = `<bluetoothctl remove ${address}> got ${data} - ${error}`;
       log.error(msg);
       reject(msg);
       return;
     }
-    resolve("device removed");
+    resolve(`${devName(foundDev)} [${foundDev.address}] removed`);
   })
 }
 
@@ -647,7 +654,7 @@ const bluetoothctlInfoDevice = () => {
       });
 
       if (exitCode) {
-        let msg = `bluetoothctl info ${dev.address} got ${data} - ${error}`;
+        let msg = `<bluetoothctl info ${dev.address}> got ${data} - ${error}`;
         log.error(msg);
         reject(msg);
         return;
@@ -685,7 +692,7 @@ const bluetoothctlDevice = () => {
     });
 
     if (exitCode) {
-      let msg = `bluetoothctl devices got ${data} - ${error}`;
+      let msg = `<bluetoothctl devices> got ${data} - ${error}`;
       log.error(msg);
       reject(msg);
       return;
@@ -717,7 +724,7 @@ const bluetoothctlShow = () => {
     });
 
     if (exitCode) {
-      let msg = `bluetoothctl show got ${data} - ${error}`;
+      let msg = `<bluetoothctl show> got ${data} - ${error}`;
       log.error(msg);
       reject(msg);
       return;
@@ -833,7 +840,7 @@ const btMngr = async () => {
       if (prevState.connectedCnt < 2) prevState.connectedCnt++;
       if (prevState.connectedCnt == 2) {
         // device just connected here
-        log.info(`connected to ${bth.status.connected.name} - ${bth.status.connected.address}`);
+        log.info(`${devName()} [${bth.status.connected.address}] connected`);
         await updateAlsaBtCfg(bth.status.connected.address);
         await saveLastDeviceConnected(bth.status.connected.address);
         await amixerSconctrols();
