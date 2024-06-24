@@ -88,7 +88,7 @@ const volumeInc = async () => {
       // save default volume value
       saveVolumeInc(1);
     }
-    resolve("done");
+    resolve(`${bth.status.connected.name}'s volume increased by 1%`);
   })
 }
 
@@ -132,7 +132,7 @@ const volumeDec = async () => {
       // save default volume value
       saveVolumeInc(-1);
     }
-    resolve("done");
+    resolve(`${bth.status.connected.name}'s volume decreased by 1%`);
   })
 }
 
@@ -151,11 +151,11 @@ const volumeSet = async (value) => {
       volCtrl = bth.status.connected.volCtrl;
       volLev = bth.status.connected.volume;
     }
-    log.info(`current settings: ${volCtrl}: ${volLev}`);
+    log.info(`current volume: ${volCtrl}: ${volLev}`);
     // set playback volume
     if (volCtrl && volLev != value) {
       let volCtrlStr = `"${volCtrl}"`;
-      log.info(`new settings: ${volCtrlStr}: ${value}`);
+      log.info(`new volume: ${volCtrlStr}: ${value}`);
       let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, value]);
       data = "";
       for await (const chunk of bthCmd.stdout)
@@ -209,7 +209,7 @@ const volumeSet = async (value) => {
 
         if (volLevel === value) doubleCheck = false;
         else {
-          log.info(`new settings: ${volCtrlStr}: ${value}`);
+          log.info(`new volume: ${volCtrlStr}: ${value}`);
           let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, value]);
           data = "";
           for await (const chunk of bthCmd.stdout)
@@ -234,7 +234,7 @@ const volumeSet = async (value) => {
       // save default volume value
       saveVolume(value);
     }
-    resolve("done");
+    resolve(`${bth.status.connected.name}'s volume set to ${value}`);
   })
 }
 
@@ -280,7 +280,7 @@ const volumeMute = async (val) => {
       }
       await amixerSconctrols();
     }
-    resolve("done");
+    resolve(`${bth.status.connected.name}'s volume ${val}d`);
   })
 }
 
@@ -474,7 +474,8 @@ const statusChange = ([attr, state]) => {
       reject(msg);
       return;
     }
-    await refreshBtInfo();
+    // must call refresh info to manage the new status
+    await btMngr();
     resolve(`${attr} ${state}`);
   })
 }
@@ -658,19 +659,19 @@ const bluetoothctlInfoDevice = () => {
 
 const bluetoothctlDevice = () => {
   return new Promise(async (resolve, reject) => {
+    bth.status.devices = [];
     let bthCmd = spawn("bluetoothctl", ["devices"]);
     let data = "";
     for await (const chunk of bthCmd.stdout)
       data += chunk;
-    bth.status.devices = [];
     for (line of data.toString().split('\n')) {
-      if (line.length < 7) continue;
-      let device = {};
       // example:
       // Device 01:15:21:47:16:D4 OneOdio A70 
       // but it also happened to be:
       // "some string" Device 01:15:21:47:16:D4 OneOdio A70 
       let pos = line.toString().search('Device');
+      if (pos < 0) continue;
+      let device = {};
       device.address = line.toString().substring(pos + 7, 24);
       device.name = line.toString().substring(pos + 25);
       bth.status.devices.push(device);
@@ -753,7 +754,7 @@ const btOff = async () => {
 }
 
 const preConnect = async () => {
-  if (!prevState.connecting) {
+  if (bth.status.Discovering === 'no') {
     await statusChange(['scan', 'on']);
     prevState.connecting = true;
     log.info("bt scan on");
@@ -803,7 +804,7 @@ const setDefaultVolume = async (address) => {
   }
 }
 
-const refreshBtInfo = async () => {
+const btMngr = async () => {
   try {
     let status = await bluetoothctlShow();
     if (status.Powered === 'no') {
@@ -812,63 +813,59 @@ const refreshBtInfo = async () => {
     }
     btOn();
     await bluetoothctlDevice();
-    if (bth.status.devices.length === 0) {
-      log.info("no bluetooth devices");
+    await bluetoothctlInfoDevice();
+    if (findConnectedDevice() === null) {
+      if (bth.output === 'enabled' && cfg.has('player.bt_output')) {
+        mpd.output(['disableoutput', cfg.get('player.bt_output')]);
+        bth.output = 'disabled'
+      }
+      if (bth.status.Discovering === 'no') {
+        await statusChange(['scan', 'on']);
+        prevState.connecting = true;
+        log.info("bt scan on");
+        prevState.connectedCnt = 0;
+        bth.intCnt = 500;
+        autoconnect();
+      }
     } else {
-      await bluetoothctlInfoDevice();
-      if (findConnectedDevice() === null) {
-        if (bth.output === 'enabled' && cfg.has('player.bt_output')) {
-          mpd.output(['disableoutput', cfg.get('player.bt_output')]);
-          bth.output = 'disabled'
+      // check connection is stable 
+      // (Jammy showed disconnection and reconnection)
+      if (prevState.connectedCnt < 2) prevState.connectedCnt++;
+      if (prevState.connectedCnt == 2) {
+        // device just connected here
+        log.info(`connected to ${bth.status.connected.name} - ${bth.status.connected.address}`);
+        await updateAlsaBtCfg(bth.status.connected.address);
+        await saveLastDeviceConnected(bth.status.connected.address);
+        await amixerSconctrols();
+        await setDefaultVolume(bth.status.connected.address);
+        await statusChange(['scan', 'off']);
+        if (bth.output === 'disabled' && cfg.has('player.bt_output')) {
+          mpd.output(['enableoutput', cfg.get('player.bt_output')]);
+          bth.output = 'enabled'
         }
-        if (!prevState.connecting) {
-          await statusChange(['scan', 'on']);
-          prevState.connecting = true;
-          log.info("bt scan on");
-          prevState.connectedCnt = 0;
-          bth.intCnt = 500;
-          autoconnect();
+        prevState.connectedCnt++;
+      }
+      if (prevState.connectedCnt > 2) {
+        // device connected, stop scanning
+        if (prevState.connecting) {
+          prevState.connecting = false;
+          log.info("bt scan off");
         }
-      } else {
-        // check connection is stable 
-        // (Jammy showed disconnection and reconnection)
-        if (prevState.connectedCnt < 2) prevState.connectedCnt++;
-        if (prevState.connectedCnt == 2) {
-          // device just connected here
-          log.info(`connected to ${bth.status.connected.name} - ${bth.status.connected.address}`);
-          await statusChange(['scan', 'off']);
-          await updateAlsaBtCfg(bth.status.connected.address);
-          await saveLastDeviceConnected(bth.status.connected.address);
-          await amixerSconctrols();
-          await setDefaultVolume(bth.status.connected.address);
-          if (bth.output === 'disabled' && cfg.has('player.bt_output')) {
-            mpd.output(['enableoutput', cfg.get('player.bt_output')]);
-            bth.output = 'enabled'
-          }
-          prevState.connectedCnt++;
-        }
-        if (prevState.connectedCnt > 2) {
-          // device connected, stop scanning
-          if (prevState.connecting) {
-            prevState.connecting = false;
-            log.info("bt scan off");
-          }
-          bth.intCnt = 5000;
-          await amixerSconctrols();
-        }
+        bth.intCnt = 5000;
+        await amixerSconctrols();
       }
     }
     if (bth.interval) clearInterval(bth.interval);
-    bth.interval = setTimeout(refreshBtInfo, bth.intCnt);
+    bth.interval = setTimeout(btMngr, bth.intCnt);
   } catch (err) {
     log.error(err);
     if (bth.interval) clearInterval(bth.interval);
-    bth.interval = setTimeout(refreshBtInfo, bth.intCnt);
+    bth.interval = setTimeout(btMngr, bth.intCnt);
   }
 }
 
 log.info("starting bluetooth mngr...")
-refreshBtInfo();
+btMngr();
 
 module.exports = {
   status: () => { return bth.status; },
