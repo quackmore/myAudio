@@ -23,6 +23,7 @@
       </div>
       <div id="btDevMod" style="display: none;">
         <div id="btDevList" style="padding: 20px; background-color: lightblue;">
+          <!--
           <div class="justify">
             <span>Device 1</span>
             <div class="right">
@@ -35,7 +36,8 @@
             <div class="right">
               <i class="fa-regular fa-trash-can"></i>
             </div>
-          </div>
+          </div> 
+          -->
         </div>
       </div>
       <div class="center" style="padding: 10px;">
@@ -247,7 +249,7 @@
         if (document.getElementById('outSel').innerText === 'Speakers')
           url = `/speakers/toggle`;
         else
-          url = `/bt/status/power/${player.bt.Powered === 'yes' ? 'off' : 'on'}`;
+          url = `/bt/power/${player.bt.Powered === 'yes' ? 'off' : 'on'}`;
         try {
           await toutFetch(url, 5000, req);
           refreshPlayerStatus();
@@ -258,13 +260,13 @@
       }
 
       let firstTime = true;
+      let getPlayerStatusFail = 0;
 
       const refreshPlayerStatus = async () => {
         try {
           if (firstTime) {
             await getSpeakerStatus();
             await getBtStatus();
-            await getBtDevices();
             await getMpdStatus();
             let output = 'Speakers';
             let cfg = {};
@@ -279,24 +281,20 @@
             updateSpeakers();
           } else {
             await getBtStatus();
-            await getBtDevices();
             updateBT();
           }
-          showBtDevices();
+          showBtDevicesPanel();
           await getMpdStatus();
           updateMpdPlayer();
           // DEBUG
           // console.log(player);
+          getPlayerStatusFail = 0;
         }
         catch (err) {
-          alert(err.message);
+          getPlayerStatusFail++;
+          if (getPlayerStatusFail > 2)
+            alert(err.message);
         }
-      }
-
-      let refreshInterval = null;
-      const periodicRefreshStatus = (val) => {
-        clearInterval(refreshInterval);
-        refreshInterval = setInterval(refreshPlayerStatus, val);
       }
 
       // SPEAKERS
@@ -479,19 +477,47 @@
           .then(data => player.bt = data)
       }
 
-      const getBtDevices = () => {
-        return toutFetch(`/bt/devices`, 5000)
-          .then(res => res.json())
-          .then(data => player.bt.devices = data)
-      }
-
-      const showBtDevices = () => {
+      const showBtDevicesPanel = () => {
         if (document.getElementById('outSel').innerText === 'Speakers') {
           closeBtDevMod();
         }
         else {
-          if (player.bt.Powered !== 'yes') closeBtDevMod();
+          if (player.bt.Powered === 'no') closeBtDevMod();
         }
+      }
+
+      let getBtStatusFail = 0;
+
+      const refreshBtStatus = async () => {
+        if (document.getElementById('outSel').innerText !== 'Bluetooth') return;
+        try {
+          {
+            await getBtStatus();
+            updateBT();
+          }
+          showBtDevicesPanel();
+          getBtStatusFail = 0;
+        }
+        catch (err) {
+          getBtStatusFail++;
+          if (getBtStatusFail > 2)
+            alert(err.message);
+        }
+      }
+
+      let refreshPlayerInterval = null;
+      const periodicRefreshStatus = (val) => {
+        clearInterval(refreshPlayerInterval);
+        refreshPlayerInterval = setInterval(refreshPlayerStatus, val);
+      }
+
+      let refreshBtInterval = null;
+      const periodicRefreshBt = (val) => {
+        clearInterval(refreshBtInterval);
+        if (val > 0)
+          refreshBtInterval = setInterval(refreshBtStatus, val);
+        else
+          refreshBtInterval = null;
       }
 
       const connectDev = async (idx) => {
@@ -501,7 +527,7 @@
         })
           .then(() => {
             // closeBtDevMod();
-            refreshPlayerStatus();
+            refreshBtStatus();
           })
           .catch((err) => alert(`Failed to connect to ${player.bt.devices[idx].name}: ${err.message}`))
           .finally(() => unloadSpinner());
@@ -511,7 +537,10 @@
         toutFetch(`/bt/device/remove/${player.bt.devices[idx].address}`, 60000, {
           method: 'POST'
         })
-          .then(() => refreshPlayerStatus())
+          .then(async () => {
+            await player.bt.devices.splice(idx, 1);
+            refreshBtStatus();
+          })
           .catch((err) => alert(`Failed to remove ${player.bt.devices[idx].name}: ${err.message}`));
       }
 
@@ -521,60 +550,44 @@
         return "";
       }
 
-      const findBTconnectedDev = async () => {
-        for (dev of player.bt.devices)
-          if (dev.connected === "yes" && dev.volCtrl) return dev;
-        return {};
-      }
-
       const openBtDevMod = () => {
+        // quick refresh to get bluetooth updates
+        if (refreshBtInterval == null) periodicRefreshBt(1000);
         if (document.getElementById("btDevMod").style.display === "block") return;
         document.getElementById("btDevMod").style.display = "block";
-        periodicRefreshStatus(3000);
-        if (player.bt.Powered === 'yes') {
-          toutFetch('/bt/status/scan/on', 5000, {
-            method: 'POST'
-          })
-            // .then(() => refreshPlayerStatus())
-            .catch((err) => alert(err.message));
-        }
       }
 
       const closeBtDevMod = () => {
         if (document.getElementById("btDevMod").style.display === "none") return;
-        setTimeout(periodicRefreshStatus, 20000, 30000);
+        // keep on quick refresh for 10 secs then slow down
+        setTimeout(periodicRefreshBt, 6000, 0);
         document.getElementById("btDevMod").style.display = "none";
-        if (player.bt.Powered === 'yes') {
-          toutFetch('/bt/status/scan/off', 5000, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          })
-            .then(() => refreshPlayerStatus())
-            .catch((err) => alert(err.message));
-        }
       }
 
+      // TODO separare refresh bluetooth dal resto
+
       const updateBT = () => {
-        if (!player.bt) return;
+        if (!player.hasOwnProperty('bt')) return;
         document.getElementById('outputSwitch').innerHTML = (player.bt.Powered === 'yes' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
         let btDevList = document.getElementById('btDevList');
+        // console.log(player.bt);
+        if (!player.bt.hasOwnProperty('devices')) return;
         btDevList.innerHTML = "";
-        let connectedDev = -1;
         for (let [idx, dev] of player.bt.devices.entries()) {
-          if (dev.connected === 'yes') connectedDev = idx;
-          btDevList.innerHTML += `<div class="justify"><span onclick="connectDev(${idx})">${dev.name}</span><span>&emsp;&emsp;</span><span class="right">${devOnline(idx)}</span><span class="right"><i class="fa-regular fa-trash-can" onclick="deleteDev(${idx})"></i></span>`;
+          btDevList.innerHTML += `<div class="justify"><span class="pointer" onclick="connectDev(${idx})">${dev.name}</span><span>&emsp;&emsp;</span><span class="right">${devOnline(idx)}</span><span class="right"><i class="fa-regular fa-trash-can pointer" onclick="deleteDev(${idx})"></i></span>`;
         }
-        if (connectedDev >= 0) {
+        if (player.bt.connected != null) {
           closeBtDevMod();
-          document.getElementById('btDevDesc').innerHTML = `<span>${player.bt.devices[connectedDev].name}</span><i class="fa-regular fa-battery-three-quarters"></i><span>${player.bt.devices[connectedDev].battery ? player.bt.devices[connectedDev].battery : ""}</span>`;
-          if (player.bt.devices[connectedDev].volume) {
-            document.getElementById('volRange').value = player.bt.devices[connectedDev].volume.split("%")[0];
-            document.getElementById('volLevel').innerText = player.bt.devices[connectedDev].volume.split("%")[0];
+          let connected = player.bt.connected;
+          document.getElementById('btDevDesc').innerHTML = `<span>${connected.name}</span><i class="fa-regular fa-battery-three-quarters"></i><span>${connected.battery ? connected.battery : ""}</span>`;
+          if (connected.volume) {
+            document.getElementById('volRange').value = connected.volume.split("%")[0];
+            document.getElementById('volLevel').innerText = connected.volume.split("%")[0];
             document.getElementById('volRange').disabled = false;
           }
-          if (player.bt.devices[connectedDev].mute) {
-            document.getElementById('volMute').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
-            document.getElementById('volMute2').innerHTML = player.bt.devices[connectedDev].mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
+          if (connected.mute) {
+            document.getElementById('volMute').innerHTML = connected.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
+            document.getElementById('volMute2').innerHTML = connected.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
           }
         }
         else {
@@ -600,14 +613,14 @@
               .then(() => refreshPlayerStatus())
               .catch((err) => alert(`Failed to set speakers volume to ${vol} - ${err.message}`));
         } else {
-          let dev = await findBTconnectedDev();
-          if (Object.keys(dev).length === 0) return;
-          if (`${vol}%` !== dev.volume)
-            toutFetch(`/bt/volume/set/${dev.address}/${vol}%25`, 60000, {
+          if (player.bt.connected == null) return;
+          let connected = player.bt.connected;
+          if (`${vol}%` !== connected.volume)
+            toutFetch(`/bt/volume/set/${vol}%25`, 60000, {
               method: 'POST'
             })
               .then(() => refreshPlayerStatus())
-              .catch((err) => alert(`Failed to set ${dev.name} volume to ${vol} - ${err.message}`));
+              .catch((err) => alert(`Failed to set ${connected.name} volume to ${vol} - ${err.message}`));
         }
       }
 
@@ -624,13 +637,12 @@
             .then(() => refreshPlayerStatus())
             .catch((err) => alert(`Failed to increment speakers volume - ${err.message}`));
         } else {
-          let dev = await findBTconnectedDev();
-          if (Object.keys(dev).length === 0) return;
-          toutFetch(`/bt/volume/inc/${dev.address}`, 60000, {
+          if (player.bt.connected == null) return;
+          toutFetch(`/bt/volume/inc`, 60000, {
             method: 'POST'
           })
             .then(() => refreshPlayerStatus())
-            .catch((err) => alert(`Failed to increment ${dev.name} volume - ${err.message}`));
+            .catch((err) => alert(`Failed to set ${player.bt.connected.name} volume to ${vol} - ${err.message}`));
         }
       }
 
@@ -643,13 +655,12 @@
             .then(() => refreshPlayerStatus())
             .catch((err) => alert(`Failed to increment speakers volume - ${err.message}`));
         } else {
-          let dev = await findBTconnectedDev();
-          if (Object.keys(dev).length === 0) return;
-          toutFetch(`/bt/volume/dec/${dev.address}`, 60000, {
+          if (player.bt.connected == null) return;
+          toutFetch(`/bt/volume/dec`, 60000, {
             method: 'POST'
           })
             .then(() => refreshPlayerStatus())
-            .catch((err) => alert(`Failed to increment ${dev.name} volume - ${err.message}`));
+            .catch((err) => alert(`Failed to set ${player.bt.connected.name} volume to ${vol} - ${err.message}`));
         }
       }
 
@@ -662,14 +673,14 @@
               .then(() => refreshPlayerStatus())
               .catch((err) => alert(`Failed to set speakers volume to [mute|unmute] - ${err.message}`));
         } else {
-          let dev = await findBTconnectedDev();
-          if (Object.keys(dev).length === 0) return;
+          if (player.bt.connected == null) return;
+          let dev = player.bt.connected;
           if (dev.mute)
-            toutFetch(`/bt/volume/set/${dev.address}/${dev.mute === "yes" ? "unmute" : "mute"}`, 60000, {
+            toutFetch(`/bt/volume/mute/${dev.mute === "yes" ? "unmute" : "mute"}`, 60000, {
               method: 'POST'
             })
               .then(() => refreshPlayerStatus())
-              .catch((err) => alert(`Failed to set ${dev.name} volume to [mute|unmute] - ${err.message}`));
+              .catch((err) => alert(`Failed to [mute|unmute] ${dev.name} volume ${err.message}`));
         }
       }
 

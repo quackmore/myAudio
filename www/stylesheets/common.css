@@ -84,6 +84,10 @@ body {
     gap: 30px;
 }
 
+.pointer {
+    cursor: pointer;
+}
+
 .outSelect {
     border-style: none;
     font-family: inherit;

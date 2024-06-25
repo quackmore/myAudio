@@ -293,19 +293,22 @@ const volumeMute = async (val) => {
 
 const deviceConnect = async (address) => {
   return new Promise(async (resolve, reject) => {
-    // log.info(`connecting to ${address}`);
     let foundDev = {};
+    // check for empty devices
     if (bth.status.devices == undefined || bth.status.devices.length === 0) {
+      log.info("deviceConnect: no devices available");
       reject("no devices available");
       return;
     }
+    // check for address in devices
     for (dev of bth.status.devices) {
       if (dev.address === address) {
         foundDev = dev;
         break;
       }
       if (dev.connected === "yes") {
-        // disconnect device
+        // disconnect already connected devices
+        log.info(`deviceConnect: disconnecting ${devName(dev)} [${address}]`);
         let bthCmd = spawn("bluetoothctl", ["disconnect", dev.address]);
         let data = "";
         for await (const chunk of bthCmd.stdout)
@@ -319,20 +322,45 @@ const deviceConnect = async (address) => {
         });
         if (exitCode) {
           let msg = `<bluetoothctl disconnect ${dev.address}> got ${data} - ${error}`;
-          log.error(msg);
+          log.error(`deviceConnect: ${msg}`);
           reject(msg);
           return;
         }
       }
     }
     if (Object.keys(foundDev).length === 0) {
+      log.info(`deviceConnect:no devices with address ${address}`);
       reject(`no devices with address ${address}`);
       return;
     }
+    // check if device is already connected
     if (foundDev.connected === "yes") {
+      log.info(`deviceConnect: ${devName(foundDev)} [${foundDev.address}] already connected`);
       resolve(`${devName(foundDev)} [${foundDev.address}] already connected`);
       return;
     }
+    // pair device
+    if (foundDev.paired !== "yes") {
+      let bthCmd = spawn("bluetoothctl", ["pair", address]);
+      let data = "";
+      for await (const chunk of bthCmd.stdout)
+        data += chunk;
+      let error = "";
+      for await (const chunk of bthCmd.stderr) {
+        error += chunk;
+      }
+      let exitCode = await new Promise((resolve, reject) => {
+        bthCmd.on('close', resolve);
+      });
+
+      if (exitCode) {
+        let msg = `<bluetoothctl pair ${address}> got ${data} - ${error}`;
+        log.error(`deviceConnect: ${msg}`);
+        reject(msg);
+        return;
+      }
+    }
+    log.info(`deviceConnect: device ${address} paired`);
     // trust device
     // log.info(`trusting ${address}`);
     if (foundDev.trusted !== "yes") {
@@ -350,35 +378,15 @@ const deviceConnect = async (address) => {
 
       if (exitCode) {
         let msg = `<bluetoothctl trust ${address}> got ${data} - ${error}`;
-        log.error(msg);
+        log.error(`deviceConnect: ${msg}`);
         reject(msg);
         return;
       }
     }
-    // pair device
-    // log.info(`pairing ${address}`);
-    if (foundDev.paired !== "yes") {
-      let bthCmd = spawn("bluetoothctl", ["pair", address]);
-      let data = "";
-      for await (const chunk of bthCmd.stdout)
-        data += chunk;
-      let error = "";
-      for await (const chunk of bthCmd.stderr) {
-        error += chunk;
-      }
-      let exitCode = await new Promise((resolve, reject) => {
-        bthCmd.on('close', resolve);
-      });
-
-      if (exitCode) {
-        let msg = `<bluetoothctl pair ${address}> got ${data} - ${error}`;
-        log.error(msg);
-        reject(msg);
-        return;
-      }
-    }
+    log.info(`deviceConnect: device ${address} trusted`);
     // connect device
-    if (foundDev.online == undefined || foundDev.online === 'no') {
+    if (foundDev.online != undefined && foundDev.online !== 'yes') {
+      log.info(`deviceConnect: ${devName(foundDev)} [${foundDev.address}] is offline`);
       reject(`${devName(foundDev)} [${foundDev.address}] is offline`);
       return;
     }
@@ -397,7 +405,7 @@ const deviceConnect = async (address) => {
 
     if (exitCode) {
       let msg = `<bluetooth connect ${address}> got ${data} - ${error}`;
-      log.error(msg);
+      log.error(`deviceConnect: ${msg}`);
       reject(msg);
       return;
     }
@@ -410,7 +418,7 @@ const autoconnect = async () => {
     let content = cfgfile.read();
     if (content != {} && content.bt && content.bt.lastConnected) {
       for (dev of bth.status.devices) {
-        if (dev.address === content.bt.lastConnected && dev.online && dev.online === 'yes') {
+        if (dev.address === content.bt.lastConnected && dev.online != undefined && dev.online === 'yes') {
           log.info(`autoconnect to ${content.bt.lastConnected}...`);
           await deviceConnect(content.bt.lastConnected);
         }
@@ -583,10 +591,10 @@ const amixerSconctrols = () => {
 
 const deviceRemove = async (address) => {
   return new Promise(async (resolve, reject) => {
-    let found = false;
+    let foundDev = null;
     for (dev of bth.status.devices)
-      if (dev.address === address) found = true;
-    if (!found) {
+      if (dev.address === address) foundDev = dev;
+    if (foundDev == null) {
       reject(`no devices with address ${foundDev.address}`);
       return;
     }
@@ -640,8 +648,14 @@ const bluetoothctlInfoDevice = () => {
           dev.connected = line.toString().split(': ')[1];
         // WARNING: 
         // using RSSI value to determine if device is online
-        // proved to be not affordable (unless bluetooth is cycled off/on)
-        // because a memory of last RSSI is showed by bluetoothctl
+        // scan must be on (or information in not updated)
+        // bluetoothctl showed this behavior:
+        // + device is online but not connected
+        //   -> RSSI is provided
+        //   -> connected: no
+        // + device is connected
+        //   -> RSSI is no longer provided
+        //   -> connected: yes
         if (line.toString().includes("RSSI"))
           dev.online = "yes";
       }
@@ -736,7 +750,7 @@ const bluetoothctlShow = () => {
 var prevState = {
   Powered: 'no',
   connecting: false,
-  connectedCnt: 0 // 1 -> just connected 2 -> connected
+  configured: false
 }
 
 const btOn = () => {
@@ -751,23 +765,24 @@ const btOff = async () => {
   if (prevState.Powered === 'yes') {
     // scan off and update previuos state
     await statusChange(['scan', 'off']);
-    prevState.Powered = 'no';
-    prevState.connecting = false;
     log.info("bt scan off");
-    prevState.connectedCnt = 0;
     bth.intCnt = 0;
     bth.status.connected = null;
+    bth.status.devices = [];
+    prevState.Powered = 'no';
+    prevState.connecting = false;
+    prevState.configured = false;
   }
 }
 
 const preConnect = async () => {
   if (bth.status.Discovering === 'no') {
-    await statusChange(['scan', 'on']);
-    prevState.connecting = true;
     log.info("bt scan on");
-    prevState.connectedCnt = 0;
-    bth.intCnt = 500;
+    await statusChange(['scan', 'on']);
   }
+  prevState.connecting = true;
+  prevState.configured = false;
+  bth.intCnt = 500;
 }
 
 const updateAlsaBtCfg = async (address) => {
@@ -819,47 +834,46 @@ const btMngr = async () => {
       return;
     }
     btOn();
+    // scanning will ensure detection of online/offline devices
+    if (bth.status.Discovering === 'no') await statusChange(['scan', 'on']);
     await bluetoothctlDevice();
     await bluetoothctlInfoDevice();
-    if (findConnectedDevice() === null) {
+    if (findConnectedDevice() == null) {
       if (bth.output === 'enabled' && cfg.has('player.bt_output')) {
         mpd.output(['disableoutput', cfg.get('player.bt_output')]);
         bth.output = 'disabled'
       }
-      if (bth.status.Discovering === 'no') {
-        await statusChange(['scan', 'on']);
-        prevState.connecting = true;
-        log.info("bt scan on");
-        prevState.connectedCnt = 0;
-        bth.intCnt = 500;
-        autoconnect();
-      }
+      if (!prevState.connecting) preConnect();
+      autoconnect();
     } else {
-      // check connection is stable 
-      // (Jammy showed disconnection and reconnection)
-      if (prevState.connectedCnt < 2) prevState.connectedCnt++;
-      if (prevState.connectedCnt == 2) {
-        // device just connected here
-        log.info(`${devName()} [${bth.status.connected.address}] connected`);
-        await updateAlsaBtCfg(bth.status.connected.address);
-        await saveLastDeviceConnected(bth.status.connected.address);
-        await amixerSconctrols();
-        await setDefaultVolume(bth.status.connected.address);
-        await statusChange(['scan', 'off']);
-        if (bth.output === 'disabled' && cfg.has('player.bt_output')) {
-          mpd.output(['enableoutput', cfg.get('player.bt_output')]);
-          bth.output = 'enabled'
+      // check if connected went offline
+      if (bth.status.connected.connected === 'no') {
+        log.info(`${devName()} disconnected`);
+        bth.status.connected = null;
+        preConnect();
+      } else {
+        if (!prevState.configured) {
+          // device just connected here
+          log.info(`${devName()} [${bth.status.connected.address}] connected`);
+          await updateAlsaBtCfg(bth.status.connected.address);
+          await saveLastDeviceConnected(bth.status.connected.address);
+          await amixerSconctrols();
+          await setDefaultVolume(bth.status.connected.address);
+          await statusChange(['scan', 'off']);
+          if (bth.output === 'disabled' && cfg.has('player.bt_output')) {
+            mpd.output(['enableoutput', cfg.get('player.bt_output')]);
+            bth.output = 'enabled'
+          }
+          prevState.configured = true;
+        } else {
+          // device connected, stop scanning
+          if (prevState.connecting) {
+            prevState.connecting = false;
+            log.info("bt scan off");
+          }
+          bth.intCnt = 5000;
+          await amixerSconctrols();
         }
-        prevState.connectedCnt++;
-      }
-      if (prevState.connectedCnt > 2) {
-        // device connected, stop scanning
-        if (prevState.connecting) {
-          prevState.connecting = false;
-          log.info("bt scan off");
-        }
-        bth.intCnt = 5000;
-        await amixerSconctrols();
       }
     }
     if (bth.interval) clearInterval(bth.interval);
@@ -877,13 +891,9 @@ btMngr();
 module.exports = {
   status: () => { return bth.status; },
   power: (val) => statusChange(["power", val]),
-  deviceConnect: async (address) => {
-    try {
-      preConnect();
-      return await deviceConnect(address);
-    } catch (err) {
-      return err;
-    }
+  deviceConnect: (address) => {
+    preConnect();
+    return deviceConnect(address);
   },
   deviceRemove: deviceRemove,
   volumeSet: volumeSet,
