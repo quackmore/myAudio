@@ -158,7 +158,7 @@
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
-          <button onclick="initLiSelected()" id="cancel2" disabled>cancel</button>
+          <button onclick="listPlaylists()" id="cancel2" disabled>cancel</button>
         </div>
       </div>
       <div class="justify" id="filesFn" style="display: none;">
@@ -701,6 +701,10 @@
         selectedTab.classList.add("selected");
       }
 
+      function getCurrentTab() {
+        return selectedTab.id;
+      }
+
       // CONTENT FOOTNOTE
 
       var selectedFN = null;
@@ -749,6 +753,7 @@
         }
         liSelected = [];
         hideCmds();
+        hidelistTitle();
       }
 
       function liSelectMultiple() {

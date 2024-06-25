@@ -159,11 +159,10 @@ function connect() {
           // on streaming errors retry connection
           if (mpdSt.status.error) {
             log.error(mpdSt.status.error);
-            if (mpdSt.curSong.file.startsWith('http')
-              && mpdSt.status.state === 'stop') {
+            if (mpdSt.curSong.file.startsWith('http') && mpdSt.status.state === 'stop') {
               if (streamPlayRetry < cfg.get('player.streamingReconnectCount')) {
                 streamPlayRetry++;
-                log.info(`will try to reconnect [${streamPlayRetry}] to stream in ${cfg.get('player.streamingReconnectTimeout') / 1000} secs...`);
+                log.info(`will try to reconnect [${streamPlayRetry}] to stream in ${(cfg.get('player.streamingReconnectTimeout')) * streamPlayRetry / 1000} secs...`);
                 setTimeout(streamPlay, cfg.get('player.streamingReconnectTimeout'));
               }
             }

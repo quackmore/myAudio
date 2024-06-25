@@ -11,8 +11,8 @@
         "alsaCfgFile": "/home/flintheart/.asoundrc",
         "streamsFile": "/home/flintheart/Music/streams/streams.json",
         "streamingPlaylist": "/home/flintheart/.config/mpd/playlists/streaming.m3u",
-        "streamingReconnectTimeout": 2000,
-        "streamingReconnectCount": 5
+        "streamingReconnectTimeout": 10000,
+        "streamingReconnectCount": 6
     },
     "speakers": {
         "contactDevice": "192.168.1.211",
