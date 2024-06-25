@@ -812,7 +812,7 @@ const saveLastDeviceConnected = async (address) => {
   if (content.bt.lastConnected !== address) {
     content.bt.lastConnected = address;
     cfgfile.save(content);
-    log.info(`device ${address} saved ad last connected device`);
+    log.info(`device ${address} saved as last connected device`);
   }
 }
 

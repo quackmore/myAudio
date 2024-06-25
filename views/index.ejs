@@ -478,12 +478,9 @@
       }
 
       const showBtDevicesPanel = () => {
-        if (document.getElementById('outSel').innerText === 'Speakers') {
-          closeBtDevMod();
-        }
-        else {
+        if (document.getElementById('outSel').innerText === 'Speakers') closeBtDevMod();
+        else
           if (player.bt.Powered === 'no') closeBtDevMod();
-        }
       }
 
       let getBtStatusFail = 0;
@@ -525,10 +522,7 @@
         toutFetch(`/bt/device/connect/${player.bt.devices[idx].address}`, 60000, {
           method: 'POST'
         })
-          .then(() => {
-            // closeBtDevMod();
-            refreshBtStatus();
-          })
+          .then(() => refreshBtStatus())
           .catch((err) => alert(`Failed to connect to ${player.bt.devices[idx].name}: ${err.message}`))
           .finally(() => unloadSpinner());
       }
