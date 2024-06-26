@@ -97,16 +97,30 @@
   </div>
   <div class="lowBox">
     <ul class="noGrowNoShrink tabrow">
-      <li onclick="loadQueue()" id="queueTab">Queue</li>
-      <li onclick="listPlaylists()" id="playlistsTab">Playlists</li>
-      <li onclick="loadFiles()" id="filesTab">Files</li>
-      <li onclick="loadStreams()" id="streamsTab">Streams</li>
-      <li onclick="loadPodcast()" id="podcastTab">Podcasts</li>
+      <li class="pointer" onclick="loadQueue()" id="queueTab">Queue</li>
+      <li class="pointer" onclick="listPlaylists()" id="playlistsTab">Playlists</li>
+      <li class="pointer" onclick="loadFiles()" id="filesTab">Files</li>
+      <li class="pointer" onclick="loadStreams()" id="streamsTab">Streams</li>
+      <li class="pointer" onclick="loadPodcast()" id="podcastTab">Podcasts</li>
     </ul>
     <div class="center tabCntTitle" id="listTitle" style="display: none;">
       <label>Playlist</label>
       <input type="text" id="plName">
       <i class="fa-solid fa-undo actBC" onclick="plModNameUndo()"></i>
+    </div>
+    <div class="center tabCntTitle" id="streamEdit" style="display: none;">
+      <div class="column">
+        <label>Name</label>
+        <label>Url</label>
+        <label>Icon</label>
+        <label>Caption</label>
+      </div>
+      <div class="column">
+        <input type="text" id="stName">
+        <input type="text" id="stUrl">
+        <input type="text" id="stIcon">
+        <input type="text" id="stCaption">
+      </div>
     </div>
     <div class="tabContent" id="tabCt">
     </div>
@@ -142,6 +156,10 @@
       <button class=" cmdBtn" onclick="stModify()">modify</button>
       <button class="cmdBtn" onclick="stReplQueue()">play</button>
       <button class="cmdBtn" onclick="stRemove()">remove</button>
+    </div>
+    <div class="cmdLine" id="streamsModifyCmds" style="display: none;">
+      <button class="cmdBtn" onclick="stModCancel()">cancel</button>
+      <button class="cmdBtn" onclick="stModSave()">save</button>
     </div>
     <div class="noGrowNoShrink justify" style="height: 50px;">
       <div class="justify" id="queueFn">
@@ -754,6 +772,7 @@
         liSelected = [];
         hideCmds();
         hidelistTitle();
+        hideStreamEdit();
       }
 
       function liSelectMultiple() {
@@ -1105,6 +1124,7 @@
       // STREAMS
 
       var streams = {};
+      var streamId = -1;
 
       const loadStreams = async () => {
         selectTab("streamsTab");
@@ -1121,24 +1141,48 @@
             if (streams.length) {
               let pl_content = '<ul class="tabCntList">';
               for ([idx, item] of streams.entries())
-                pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${item.name} - <small><i>${item.location}</i></small></li>`;
+                pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${item.name} - <small><i>${item.url}</i></small></li>`;
               pl_content += "</ul>";
               document.getElementById("tabCt").innerHTML = pl_content;
             } else
               document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
           })
           .catch(err => alert(err.message));
+
+      }
+
+      function showStreamEdit(stEl) {
+        if (stEl != undefined) {
+          document.getElementById("stName").value = stEl.name;
+          document.getElementById("stUrl").value = stEl.url;
+          document.getElementById("stIcon").value = stEl.icon;
+          document.getElementById("stCaption").value = stEl.caption;
+        }
+        document.getElementById("streamEdit").style.display = "flex";
+      }
+
+      function hideStreamEdit() {
+        document.getElementById("streamEdit").style.display = "none";
       }
 
       function newStream() {
-        alert("not implemented");
+        selectCmds("streamsModifyCmds");
+        showCmds();
+        let stEl = {
+          name: "",
+          url: "",
+          icon: "/icon/radio.png",
+          caption: ""
+        }
+        streamId = streams.length;
+        showStreamEdit(stEl);
       }
 
       function stReplQueue() {
         let req = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: `{"playlist": "#EXTM3U\\n\\n#EXTALB: ${streams[liSelected[0]].name}\\n#EXTINF:111, ${streams[liSelected[0]].name}\\n${streams[liSelected[0]].location}\\n"}`
+          body: `{"playlist": "#EXTM3U\\n\\n#EXTALB: ${streams[liSelected[0]].name}\\n#EXTINF:111, ${streams[liSelected[0]].name}\\n${streams[liSelected[0]].url}\\n"}`
         };
         mpdCmd('clear', [])
           .then(() => toutFetch(`/stream/createStreamingPlaylist`, 5000, req))
@@ -1150,11 +1194,56 @@
       }
 
       function stModify() {
-        alert("not implemented");
+        let stEl = streams[liSelected[0]];
+        streamId = liSelected[0];
+        selectCmds("streamsModifyCmds");
+        showCmds();
+        showStreamEdit(stEl);
       }
 
-      function stRemove() {
-        alert("not implemented");
+      async function stRemove() {
+        let text = "This operation cannot be undone...";
+        if (confirm(text) == true) {
+          await liSelected.reverse();
+          await liSelected.map(el => streams.splice(el, 1));
+          stModSave();
+        }
+      }
+
+      function stModCancel() {
+        hideStreamEdit();
+        loadStreams();
+      }
+
+      function stModSave() {
+        if (streamId < 0 || streamId > (streams.length + 1)) return;
+        if (streamId > 0 && streamId < streams.length) {
+          // modifying an element
+          streams[streamId].name = document.getElementById('stName').value;
+          streams[streamId].url = document.getElementById('stUrl').value;
+          streams[streamId].icon = document.getElementById('stIcon').value;
+          streams[streamId].caption = document.getElementById('stCaption').value;
+        }
+        if (streamId == streams.length) {
+          // adding an element
+          let stEl = {
+            name: document.getElementById('stName').value,
+            url: document.getElementById('stUrl').value,
+            icon: document.getElementById('stIcon').value,
+            caption: document.getElementById('stCaption').value
+          };
+          streams.push(stEl);
+        }
+        req = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(streams)
+        };
+        return toutFetch('/stream', 5000, req)
+          .then(() => stModCancel())
+          .catch(err => {
+            if (onError) onError(err)
+          });
       }
 
       // PODCAST

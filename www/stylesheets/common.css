@@ -11,6 +11,16 @@ body {
     padding: 10px;
 }
 
+.column {
+    display: flex;
+    flex-direction: column;
+    align-items: baseline;
+}
+
+.pointer {
+    cursor: pointer;
+}
+
 .actC {
     cursor: pointer;
 }
@@ -82,10 +92,6 @@ body {
     justify-content: center;
     align-items: center;
     gap: 30px;
-}
-
-.pointer {
-    cursor: pointer;
 }
 
 .outSelect {
