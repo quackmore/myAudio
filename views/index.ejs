@@ -284,7 +284,9 @@
         try {
           if (firstTime) {
             await getSpeakerStatus();
+            updateSpeakers();
             await getBtStatus();
+            updateBT();
             await getMpdStatus();
             let output = 'Speakers';
             let cfg = {};
