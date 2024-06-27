@@ -9,7 +9,6 @@
     "player": {
         "bt_output": "bth-speaker",
         "alsaCfgFile": "/home/flintheart/.asoundrc",
-        "streamsFile": "/home/flintheart/Music/streams/streams.json",
         "streamingPlaylist": "/home/flintheart/.config/mpd/playlists/streaming.m3u",
         "streamingReconnectTimeout": 2000,
         "streamingReconnectCount": 5
