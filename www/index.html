@@ -107,7 +107,7 @@
       <li class="pointer" onclick="listPlaylists()" id="playlistsTab">Playlists</li>
       <li class="pointer" onclick="loadFiles()" id="filesTab">Files</li>
       <li class="pointer" onclick="loadStreams()" id="streamsTab">Streams</li>
-      <li class="pointer" onclick="loadPodcast()" id="podcastTab">Podcasts</li>
+      <li class="pointer" onclick="loadPodcasts()" id="podcastTab">Podcasts</li>
     </ul>
     <div class="center tabCntTitle" id="listTitle" style="display: none;">
       <label>Playlist</label>
@@ -126,6 +126,18 @@
         <input type="text" id="stUrl">
         <input type="text" id="stIcon">
         <input type="text" id="stCaption">
+      </div>
+    </div>
+    <div class="center tabCntTitle" id="podcastEdit" style="display: none;">
+      <div class="column">
+        <label>Name</label>
+        <label>Url</label>
+        <label>File</label>
+      </div>
+      <div class="column">
+        <input type="text" id="podName">
+        <input type="text" id="podUrl">
+        <input type="text" id="podFile">
       </div>
     </div>
     <div class="tabContent" id="tabCt">
@@ -167,6 +179,19 @@
       <button class="cmdBtn" onclick="stModCancel()">cancel</button>
       <button class="cmdBtn" onclick="stModSave()">save</button>
     </div>
+    <div class="cmdLine" id="podcastCmds" style="display: none;">
+      <button class=" cmdBtn" onclick="podModify()">modify</button>
+      <button class="cmdBtn" onclick="podRemove()">remove</button>
+      <button class="cmdBtn" onclick="podShow()">show episodes</button>
+    </div>
+    <div class="cmdLine" id="podcastModifyCmds" style="display: none;">
+      <button class="cmdBtn" onclick="podModCancel()">cancel</button>
+      <button class="cmdBtn" onclick="podModSave()">save</button>
+    </div>
+    <div class="cmdLine" id="podcastSelectCmds" style="display: none;">
+      <button class="cmdBtn" onclick="podBack()">cancel</button>
+      <button class="cmdBtn" onclick="podAddToQueue()">add to queue</button>
+    </div>
     <div class="noGrowNoShrink justify" style="height: 50px;">
       <div class="justify" id="queueFn">
         <div class="left" style="font-size: medium;">
@@ -199,6 +224,14 @@
         <div class="right">
           <button onclick="initLiSelected()" id="cancel4" disabled>cancel</button>
           <button onclick="newStream()">new stream</button>
+        </div>
+      </div>
+      <div class="justify" id="podcastFn" style="display: none;">
+        <div class="left" style="font-size: medium;">
+        </div>
+        <div class="right">
+          <button onclick="initLiSelected()" id="cancel5" disabled>cancel</button>
+          <button onclick="newPodcast()">new podcast</button>
         </div>
       </div>
     </div>
@@ -732,6 +765,7 @@
       document.getElementById("cancel2").disabled = false;
       document.getElementById("cancel3").disabled = false;
       document.getElementById("cancel4").disabled = false;
+      document.getElementById("cancel5").disabled = false;
     }
 
     function hideCmds() {
@@ -740,6 +774,7 @@
       document.getElementById("cancel2").disabled = true;
       document.getElementById("cancel3").disabled = true;
       document.getElementById("cancel4").disabled = true;
+      document.getElementById("cancel5").disabled = true;
     }
 
     var liSelected = [];
@@ -757,6 +792,7 @@
       hideCmds();
       hidelistTitle();
       hideStreamEdit();
+      hidePodcastEdit();
     }
 
     function liSelectMultiple() {
@@ -1107,7 +1143,7 @@
 
     // STREAMS
 
-    var streams = {};
+    var streams = [];
     var streamId = -1;
 
     const loadStreams = async () => {
@@ -1136,12 +1172,10 @@
     }
 
     function showStreamEdit(stEl) {
-      if (stEl != undefined) {
-        document.getElementById("stName").value = stEl.name;
-        document.getElementById("stUrl").value = stEl.url;
-        document.getElementById("stIcon").value = stEl.icon;
-        document.getElementById("stCaption").value = stEl.caption;
-      }
+      document.getElementById("stName").value = stEl.name;
+      document.getElementById("stUrl").value = stEl.url;
+      document.getElementById("stIcon").value = stEl.icon;
+      document.getElementById("stCaption").value = stEl.caption;
       document.getElementById("streamEdit").style.display = "flex";
     }
 
@@ -1190,7 +1224,15 @@
       if (confirm(text) == true) {
         await liSelected.reverse();
         await liSelected.map(el => streams.splice(el, 1));
-        stModSave();
+        toutFetch('/stream', 5000, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(streams)
+        })
+          .then(() => stModCancel())
+          .catch(err => {
+            if (onError) onError(err)
+          });
       }
     }
 
@@ -1232,12 +1274,125 @@
 
     // PODCAST
 
-    const loadPodcast = async () => {
+    var podcasts = [];
+    var podcastId = -1;
+
+    const loadPodcasts = async () => {
       selectTab("podcastTab");
-      // selectFN("streamsFn");
-      // selectCmds("streamsCmds");
-      // toutFetch(`/podcast`, 5000)
-      //   .catch(err => alert(err.message));
+      selectFN("podcastFn");
+      selectCmds("podcastCmds");
+      toutFetch(`/podcast`, 5000)
+        .then(data => data.json())
+        .then(data => {
+          podcasts = data.sort((a, b) => {
+            if (a.name < b.name) return -1;
+            if (a.name > b.name) return 1;
+            return 0;
+          });;
+          if (podcasts.length) {
+            let pl_content = '<ul class="tabCntList">';
+            for ([idx, item] of podcasts.entries())
+              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${item.name}</li>`;
+            pl_content += "</ul>";
+            document.getElementById("tabCt").innerHTML = pl_content;
+          } else
+            document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+        })
+        .catch(err => alert(err.message));
+    }
+
+    function showPodcastEdit(podEl) {
+      document.getElementById("podName").value = podEl.name;
+      document.getElementById("podUrl").value = podEl.url;
+      document.getElementById("podFile").value = podEl.file;
+      document.getElementById("podcastEdit").style.display = "flex";
+    }
+
+    function hidePodcastEdit() {
+      document.getElementById("podcastEdit").style.display = "none";
+    }
+
+    const newPodcast = () => {
+      selectCmds("podcastModifyCmds");
+      showCmds();
+      podcastId = podcasts.length;
+      let podEl = {
+        name: "",
+        url: "",
+        file: ""
+      };
+      showPodcastEdit(podEl);
+    }
+
+    const podModify = () => {
+      let podEl = podcasts[liSelected[0]];
+      podcastId = liSelected[0];
+      selectCmds("podcastModifyCmds");
+      showCmds();
+      showPodcastEdit(podEl);
+    }
+
+    const podRemove = async () => {
+      let text = "This operation cannot be undone...";
+      if (confirm(text) == true) {
+        await liSelected.reverse();
+        await liSelected.map(el => podcasts.splice(el, 1));
+        toutFetch('/podcast', 5000, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(podcasts)
+        })
+          .then(() => podModCancel())
+          .catch(err => {
+            if (onError) onError(err)
+          });
+      }
+    }
+
+    const podModCancel = () => {
+      hidePodcastEdit();
+      loadPodcasts();
+    }
+
+    const podModSave = () => {
+      if (podcastId < 0 || podcastId > (podcasts.length + 1)) return;
+      if (podcastId > 0 && podcastId < podcasts.length) {
+        // modifying an element
+        podcasts[podcastId].name = document.getElementById('podName').value;
+        podcasts[podcastId].url = document.getElementById('podUrl').value;
+        podcasts[podcastId].icon = document.getElementById('podFile').value;
+      }
+      if (podcastId == podcasts.length) {
+        // adding an element
+        let podEl = {
+          name: document.getElementById('podName').value,
+          url: document.getElementById('podUrl').value,
+          file: document.getElementById('podFile').value
+        };
+        podcasts.push(podEl);
+      }
+      req = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(podcasts)
+      };
+      return toutFetch('/podcast', 5000, req)
+        .then(() => podModCancel())
+        .catch(err => {
+          if (onError) onError(err)
+        });
+    }
+
+    const podShow = () => {
+      alert('Not Implemented.');
+    }
+
+    const podBack = () => {
+      alert('Not Implemented.');
+    }
+
+    const podAddToQueue = () => {
+      alert('Not Implemented.');
     }
 
     // STARTUP
