@@ -14,9 +14,6 @@ const req = require('express/lib/request');
 
 const web = express();
 
-web.set('view engine', 'ejs');
-web.set('views', path.join(process.cwd(), 'views'));
-
 if (process.env.NODE_ENV === 'development')
     web.use(morgan('dev'));
 else

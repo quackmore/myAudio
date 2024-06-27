@@ -4,8 +4,7 @@ var router = express.Router();
 
 /* GET home page. */
 router.get('/', async function (req, res, next) {
-  // using ejs for rendering
-  res.render('index', { prefs: { audioContactDev: `${cfg.get('speakers.contactDevice')}`, audioContactRel: `${cfg.get('speakers.contactRelay')}` } });
+  res.sendFile(path.join(__dirname, '/index.html'));
 });
 
 module.exports = router;
