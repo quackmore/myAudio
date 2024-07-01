@@ -231,7 +231,7 @@
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
-          <button onclick="loadPodcasts()" id="cancel5" disabled>cancel</button>
+          <button onclick="loadPodcasts()" id="cancel5">cancel</button>
           <button onclick="newPodcast()">new podcast</button>
         </div>
       </div>
@@ -766,7 +766,7 @@
       document.getElementById("cancel2").disabled = false;
       document.getElementById("cancel3").disabled = false;
       document.getElementById("cancel4").disabled = false;
-      document.getElementById("cancel5").disabled = false;
+      // document.getElementById("cancel5").disabled = false;
     }
 
     function hideCmds() {
@@ -775,7 +775,7 @@
       document.getElementById("cancel2").disabled = true;
       document.getElementById("cancel3").disabled = true;
       document.getElementById("cancel4").disabled = true;
-      document.getElementById("cancel5").disabled = true;
+      // document.getElementById("cancel5").disabled = true;
     }
 
     var liSelected = [];
@@ -1244,7 +1244,7 @@
 
     function stModSave() {
       if (streamId < 0 || streamId > (streams.length + 1)) return;
-      if (streamId > 0 && streamId < streams.length) {
+      if (streamId >= 0 && streamId < streams.length) {
         // modifying an element
         streams[streamId].name = document.getElementById('stName').value;
         streams[streamId].url = document.getElementById('stUrl').value;
@@ -1358,11 +1358,11 @@
 
     const podModSave = () => {
       if (podcastId < 0 || podcastId > (podcasts.length + 1)) return;
-      if (podcastId > 0 && podcastId < podcasts.length) {
+      if (podcastId >= 0 && podcastId < podcasts.length) {
         // modifying an element
         podcasts[podcastId].name = document.getElementById('podName').value;
         podcasts[podcastId].url = document.getElementById('podUrl').value;
-        podcasts[podcastId].icon = document.getElementById('podFile').value;
+        podcasts[podcastId].file = document.getElementById('podFile').value;
       }
       if (podcastId == podcasts.length) {
         // adding an element
@@ -1388,7 +1388,7 @@
     const showEpisodesList = () => {
       if (feed.length) {
         let pl_content = '<ul class="tabCntList">';
-        feed.map((el, idx) => pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${el.date} - ${el.title}</li><div id="liDesc_${idx}" class="modal" style="display: none;">${el.contentSnippet}</div>`)
+        feed.map((el, idx) => pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${el.date} - ${el.title} ${el.duration ? '[' + secsToString(el.duration) + ']' : ''}</li><div id="liDesc_${idx}" class="modal" style="display: none;">${el.contentSnippet}</div>`)
         pl_content += "</ul>";
         document.getElementById("tabCt").innerHTML = pl_content;
       } else
