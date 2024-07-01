@@ -189,8 +189,9 @@
       <button class="cmdBtn" onclick="podModSave()">save</button>
     </div>
     <div class="cmdLine" id="podcastSelectCmds" style="display: none;">
-      <button class="cmdBtn" onclick="podBack()">cancel</button>
       <button class="cmdBtn" onclick="podAddToQueue()">add to queue</button>
+      <button class="cmdBtn" onclick="podSelCancel()">cancel</button>
+      <button class="cmdBtn" onclick="podShowContent()" id="podSCBtn">show content</button>
     </div>
     <div class="noGrowNoShrink justify" style="height: 50px;">
       <div class="justify" id="queueFn">
@@ -230,7 +231,7 @@
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
-          <button onclick="initLiSelected()" id="cancel5" disabled>cancel</button>
+          <button onclick="loadPodcasts()" id="cancel5" disabled>cancel</button>
           <button onclick="newPodcast()">new podcast</button>
         </div>
       </div>
@@ -1231,7 +1232,7 @@
         })
           .then(() => stModCancel())
           .catch(err => {
-            if (onError) onError(err)
+            alert(err.message);
           });
       }
     }
@@ -1268,7 +1269,7 @@
       return toutFetch('/stream', 5000, req)
         .then(() => stModCancel())
         .catch(err => {
-          if (onError) onError(err)
+          alert(err.message);
         });
     }
 
@@ -1276,6 +1277,7 @@
 
     var podcasts = [];
     var podcastId = -1;
+    var feed = [];
 
     const loadPodcasts = async () => {
       selectTab("podcastTab");
@@ -1344,7 +1346,7 @@
         })
           .then(() => podModCancel())
           .catch(err => {
-            if (onError) onError(err)
+            alert(err.message);
           });
       }
     }
@@ -1379,20 +1381,62 @@
       return toutFetch('/podcast', 5000, req)
         .then(() => podModCancel())
         .catch(err => {
-          if (onError) onError(err)
+          alert(err.message);
         });
     }
 
-    const podShow = () => {
-      alert('Not Implemented.');
+    const showEpisodesList = () => {
+      if (feed.length) {
+        let pl_content = '<ul class="tabCntList">';
+        feed.map((el, idx) => pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${el.date} - ${el.title}</li><div id="liDesc_${idx}" class="modal" style="display: none;">${el.contentSnippet}</div>`)
+        pl_content += "</ul>";
+        document.getElementById("tabCt").innerHTML = pl_content;
+      } else
+        document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
     }
 
-    const podBack = () => {
-      alert('Not Implemented.');
+    const podShow = () => {
+      toutFetch(`/podcast/episodes/${encodeURIComponent(podcasts[liSelected[0]].url)}`, 5000)
+        .then(res => res.json())
+        .then(data => {
+          feed = data;
+          selectCmds('podcastSelectCmds');
+          showCmds();
+          showEpisodesList();
+        })
+        .catch(err => {
+          alert(err.message);
+        });
+    }
+
+    const podSelCancel = () => {
+      let btn = document.getElementById('podSCBtn');
+      if (btn.innerHTML === 'hide content')
+        liSelected.map(el => {
+          let div = document.getElementById(`liDesc_${el}`);
+          div.style.display = 'none';
+          btn.innerHTML = 'show content';
+        });
+      initLiSelected();
+    }
+
+    const podShowContent = () => {
+      let btn = document.getElementById('podSCBtn');
+      liSelected.map(el => {
+        let div = document.getElementById(`liDesc_${el}`);
+        if (div.style.display === 'block') {
+          div.style.display = 'none';
+          btn.innerHTML = 'show content';
+        } else {
+          div.style.display = 'block';
+          btn.innerHTML = 'hide content';
+        }
+      });
     }
 
     const podAddToQueue = () => {
-      alert('Not Implemented.');
+      liSelected.map(el => mpdCmd('add', [encodeURIComponent(feed[el].url)]));
+      initLiSelected();
     }
 
     // STARTUP

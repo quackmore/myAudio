@@ -3,6 +3,7 @@ const log = require('../../logger');
 const fs = require('fs');
 const cfgFilesRoot = require('../../utils/cfgFilesRoot');
 const path = require('path');
+const podcast = require('../../podcast');
 
 const podcastsFile = path.join(cfgFilesRoot(), "/podcasts/podcasts.json");
 const router = express.Router();
@@ -21,6 +22,16 @@ router.post('/', async function (req, res, next) {
   try {
     fs.writeFileSync(podcastsFile, JSON.stringify(req.body));
     res.sendStatus(200);
+  } catch (err) {
+    log.error(err.message)
+    res.status(500).send(err.message);
+  }
+});
+
+router.get('/episodes/:feed', async function (req, res, next) {
+  try {
+    let summary = await podcast.getEpisodes(req.params.feed);
+    res.json(summary);
   } catch (err) {
     log.error(err.message)
     res.status(500).send(err.message);

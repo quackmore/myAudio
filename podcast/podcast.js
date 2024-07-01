@@ -1,16 +1,12 @@
 const https = require('node:https');
-const podcastParser = require('rss-parser');
+const RSSParser = require('rss-parser');
 
-let parser = new podcastParser();
-
-async function print() {
-
-  parser.parseURL('https://www.spreaker.com/show/4255213/episodes/feed', function (err, feed) {
-    console.log(feed);
-  })
+async function getEpisodes(feedUrl) {
+  let parser = new RSSParser();
+  let feed = await parser.parseURL(feedUrl);
+  return feed.items.map(item => ({ title: item.title, url: item.link, contentSnippet: item.contentSnippet, date: item.isoDate.substring(0,10) }));
 }
 
-
 module.exports = {
-  print: print
+  getEpisodes: getEpisodes
 }
