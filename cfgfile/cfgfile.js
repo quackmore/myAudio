@@ -3,21 +3,21 @@ import path from 'path';
 import fs from 'fs';
 import cfgFilesRoot from '../utils/cfgFilesRoot.js';
 
-
-export default {
-  init: () => {
-    try {
-      if (!fs.existsSync(cfgFilesRoot())) {
-        fs.mkdirSync(cfgFilesRoot());
-      }
-    } catch (err) {
-      log.error(err.message);
+function init() {
+  try {
+    if (!fs.existsSync(cfgFilesRoot())) {
+      fs.mkdirSync(cfgFilesRoot());
     }
-  },
-  read: () => {
+  } catch (err) {
+    log.error(err.message);
+  }
+}
+
+function read() {
+  return new Promise(async (resolve, reject) => {
     try {
       let file_content = fs.readFileSync(path.join(cfgFilesRoot(), "config.json"));
-      return JSON.parse(file_content);
+      resolve(JSON.parse(file_content));
     } catch (err) {
       log.error(err.message)
       if (err.code === 'ENOENT') {
@@ -27,14 +27,23 @@ export default {
           log.error(err.message)
         }
       }
-      return {};
+      reject(err.message);
     }
-  },
-  save: (content) => {
+  })
+}
+
+function save(content) {
+  return new Promise(async (resolve, reject) => {
     try {
       fs.writeFileSync(path.join(cfgFilesRoot(), "config.json"), JSON.stringify(content, null, 4));
     } catch (err) {
       log.error(err.message)
     }
-  }
+  })
+}
+
+export default {
+  init: init,
+  read: read,
+  save: save
 };

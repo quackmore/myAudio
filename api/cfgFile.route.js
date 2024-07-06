@@ -1,24 +1,18 @@
 import express from 'express';
-import cfg from '../cfgfile/cfgfile.js';
+import cfgFile from '../cfgfile/cfgfile.js';
 
 const router = express.Router();
 
 router.get('/', async function (req, res, next) {
-  try {
-    let file_content = cfg.read();
-    res.json(file_content);
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
+  cfgFile.read()
+    .then(data => res.json(data))
+    .catch(err => res.status(500).send(err));
 });
 
 router.post('/', async function (req, res, next) {
-  try {
-    cfg.save(req.body);
-    res.sendStatus(200);
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
+  cfgFile.save(req.body)
+    .then(res.sendStatus(200))
+    .catch(err => res.status(500).send(err));
 });
 
 export default router;
