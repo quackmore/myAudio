@@ -1,5 +1,5 @@
 import express from 'express';
-import spkrs from '../../speakers/speakers.js';
+import spkrs from '../speakers/speakers.js';
 
 const router = express.Router();
 

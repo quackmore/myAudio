@@ -2,13 +2,13 @@ import express from 'express';
 import path from 'path';
 import morgan from 'morgan';
 
-import btRouter from '../api/bt/bt.route.js';
-import cfgFile from '../api/cfgFile/cfgFile.route.js';
-import homeRouter from '../api/home/home.route.js';
-import mpdRouter from '../api/mpd/mpd.route.js';
-import podcastRouter from '../api/podcast/podcast.route.js';
-import speakersRouter from '../api/speakers/speakers.route.js';
-import streamRouter from '../api/stream/stream.route.js';
+import btRouter from '../api/bt.route.js';
+import cfgFile from '../api/cfgFile.route.js';
+import homeRouter from '../api/home.route.js';
+import mpdRouter from '../api/mpd.route.js';
+import podcastRouter from '../api/podcast.route.js';
+import speakersRouter from '../api/speakers.route.js';
+import streamRouter from '../api/stream.route.js';
 
 const web = express();
 

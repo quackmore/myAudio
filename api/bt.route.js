@@ -1,5 +1,5 @@
 import express from 'express';
-import bt from '../../bt/bt.js';
+import bt from '../bt/bt.js';
 
 const router = express.Router();
 

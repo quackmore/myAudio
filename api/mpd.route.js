@@ -1,5 +1,5 @@
 import express from 'express';
-import mpd from '../../mpd/mpd.js';
+import mpd from '../mpd/mpd.js';
 
 const router = express.Router();
 

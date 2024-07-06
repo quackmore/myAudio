@@ -1,8 +1,8 @@
 import express from 'express';
 import cfg from 'config';
-import log from '../../logger/logger.js';
+import log from '../logger/logger.js';
 import fs from 'fs';
-import cfgFilesRoot from '../../utils/cfgFilesRoot.js';
+import cfgFilesRoot from '../utils/cfgFilesRoot.js';
 import path from 'path';
 
 const streamsFile = path.join(cfgFilesRoot(), "/streams/streams.json");

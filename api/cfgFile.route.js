@@ -1,5 +1,5 @@
 import express from 'express';
-import cfg from '../../cfgfile/cfgfile.js';
+import cfg from '../cfgfile/cfgfile.js';
 
 const router = express.Router();
 
