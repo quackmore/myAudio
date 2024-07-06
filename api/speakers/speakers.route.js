@@ -1,5 +1,6 @@
-const express = require('express');
-const spkrs = require('../../speakers');
+import express from 'express';
+import spkrs from '../../speakers/speakers.js';
+
 const router = express.Router();
 
 router.get('/status', async function (req, res, next) {
@@ -47,4 +48,4 @@ router.post('/volume/mute/:val', async function (req, res, next) {
     .catch(err => res.status(500).send(err.message));
 });
 
-module.exports = router;
+export default router;

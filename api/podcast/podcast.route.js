@@ -1,41 +1,27 @@
-const express = require('express');
-const log = require('../../logger');
-const fs = require('fs');
-const cfgFilesRoot = require('../../utils/cfgFilesRoot');
-const path = require('path');
-const podcast = require('../../podcast');
+import express from 'express';
+import podcast from '../../podcast/podcast.js';
 
-const podcastsFile = path.join(cfgFilesRoot(), "/podcasts/podcasts.json");
 const router = express.Router();
 
 router.get('/', async function (req, res, next) {
-  try {
-    let file_content = fs.readFileSync(podcastsFile, "utf-8");
-    res.json(JSON.parse(file_content));
-  } catch (err) {
-    log.error(err.message)
-    res.status(500).send(err.message);
-  }
+  podcast.getList()
+    .then(data => res.json(data))
+    .catch(err => res.status(500).send(err));
 });
 
 router.post('/', async function (req, res, next) {
-  try {
-    fs.writeFileSync(podcastsFile, JSON.stringify(req.body));
-    res.sendStatus(200);
-  } catch (err) {
-    log.error(err.message)
-    res.status(500).send(err.message);
-  }
+  podcast.saveList(req.body)
+    .then(res.sendStatus(200))
+    .catch(err => res.status(500).send(err));
 });
 
 router.get('/episodes/:feed', async function (req, res, next) {
-  try {
-    let summary = await podcast.getEpisodes(req.params.feed);
-    res.json(summary);
-  } catch (err) {
-    log.error(err.message)
-    res.status(500).send(err.message);
-  }
+  podcast.getEpisodes(req.params.feed)
+    .then(data => res.json(data))
+    .catch(err => res.status(500).send(err));
 });
 
-module.exports = router;
+router.post('/add/filename/:filename/url/:url', async function (req, res, next) {
+});
+
+export default router;

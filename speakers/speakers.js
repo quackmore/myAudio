@@ -1,13 +1,13 @@
-const log = require('../logger')
-const cfg = require('config');
-const cfgfile = require('../cfgfile');
-const espFetch = require('../utils/espFetch');
+import log from '../logger/logger.js';
+import cfg from 'config';
+import cfgfile from '../cfgfile/cfgfile.js';
+import espFetch from '../utils/espFetch.js';
 
-const { spawn } = require("child_process");
+import { spawn } from 'child_process';
 
 async function status() {
   try {
-    let speakers = await module.exports.volumeGet();
+    let speakers = await volumeGet();
     let res = await espFetch(`http://${cfg.get('speakers.contactDevice')}/auxContactsStatus`, 5000);
     let data = await res.json();
     speakers.speakerOn = (data.aux_contacts_status[cfg.get('speakers.contactRelay')] === 'closed' ? 'on' : 'off');
@@ -48,7 +48,7 @@ async function volumeGet() {
   for await (const chunk of spkrsCmd.stdout)
     data += chunk;
   let volLevel = "";
-  for (line of data.toString().split('\n')) {
+  for (let line of data.toString().split('\n')) {
     if (line.toString().length < 2) continue;
     volLevel = line.toString();
   }
@@ -56,11 +56,11 @@ async function volumeGet() {
     speakers.volume = volLevel.match(/\[(.*?)\]/)[1];
     speakers.mute = volLevel.match(/\[on\]/) ? "no" : "yes";
   }
-  error = "";
+  let error = "";
   for await (const chunk of spkrsCmd.stderr) {
     error += chunk;
   }
-  exitCode = await new Promise((resolve, reject) => {
+  let exitCode = await new Promise((resolve, reject) => {
     spkrsCmd.on('close', resolve);
   });
 
@@ -93,11 +93,11 @@ async function volumeSet(value) {
   data = "";
   for await (const chunk of spkrsCmd.stdout)
     data += chunk;
-  error = "";
+  let error = "";
   for await (const chunk of spkrsCmd.stderr) {
     error += chunk;
   }
-  exitCode = await new Promise((resolve, reject) => {
+  let exitCode = await new Promise((resolve, reject) => {
     spkrsCmd.on('close', resolve);
   });
 
@@ -113,17 +113,17 @@ async function volumeSet(value) {
 }
 
 async function volumeInc() {
-  let speakers = await module.exports.volumeGet();
+  let speakers = await volumeGet();
   if (speakers.volume != "100%") {
     let spkrsCmd = spawn("amixer", ["-c", cfg.get('speakers.card'), "sset", cfg.get('speakers.volumeCtrl'), "1%+"]);
     data = "";
     for await (const chunk of spkrsCmd.stdout)
       data += chunk;
-    error = "";
+    let error = "";
     for await (const chunk of spkrsCmd.stderr) {
       error += chunk;
     }
-    exitCode = await new Promise((resolve, reject) => {
+    let exitCode = await new Promise((resolve, reject) => {
       spkrsCmd.on('close', resolve);
     });
 
@@ -139,17 +139,17 @@ async function volumeInc() {
 }
 
 async function volumeDec() {
-  let speakers = await module.exports.volumeGet();
+  let speakers = await volumeGet();
   if (speakers.volume != "100%") {
     let spkrsCmd = spawn("amixer", ["-c", cfg.get('speakers.card'), "sset", cfg.get('speakers.volumeCtrl'), "1%-"]);
     data = "";
     for await (const chunk of spkrsCmd.stdout)
       data += chunk;
-    error = "";
+    let error = "";
     for await (const chunk of spkrsCmd.stderr) {
       error += chunk;
     }
-    exitCode = await new Promise((resolve, reject) => {
+    let exitCode = await new Promise((resolve, reject) => {
       spkrsCmd.on('close', resolve);
     });
 
@@ -171,11 +171,11 @@ async function volumeMute(val) {
   data = "";
   for await (const chunk of spkrsCmd.stdout)
     data += chunk;
-  error = "";
+  let error = "";
   for await (const chunk of spkrsCmd.stderr) {
     error += chunk;
   }
-  exitCode = await new Promise((resolve, reject) => {
+  let exitCode = await new Promise((resolve, reject) => {
     spkrsCmd.on('close', resolve);
   });
 
@@ -187,7 +187,7 @@ async function volumeMute(val) {
   return "done";
 }
 
-module.exports = {
+export default {
   status: status,
   toggle: toggle,
   volumeGet: volumeGet,

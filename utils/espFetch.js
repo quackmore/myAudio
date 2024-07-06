@@ -21,4 +21,4 @@ const espFetch = (url, ms, { signal, ...options } = {}) => {
   return promise.finally(() => clearTimeout(timeout));
 }
 
-module.exports = espFetch;
+export default espFetch;

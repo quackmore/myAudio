@@ -1,11 +1,10 @@
 // start-up
-const log = require('./logger')
-// const bt = require('./bt')
-const httpd = require('./httpd/httpd')
-const config = require('config');
-const packageJSON = require("./package.json");
-const cfgFile = require("./cfgfile");
-const mpd = require("./mpd");
+import log from './logger/logger.js';
+import httpd from './httpd/httpd.js';
+import config from 'config';
+import packageJSON from "./package.json" assert { type: "json" };
+import cfgFile from "./cfgfile/cfgfile.js";
+import mpd from "./mpd/mpd.js";
 
 log.info(`${packageJSON.name} started`);
 cfgFile.init();

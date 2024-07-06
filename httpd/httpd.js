@@ -1,13 +1,7 @@
-#!/usr/bin/env node
-
-/**
- * Module dependencies.
- */
-
-const web = require('./web');
-const log = require('../logger');
-const http = require('http');
-const config = require('config');
+import web from './web.js';
+import log from '../logger/logger.js';
+import http from 'http';
+import config from 'config';
 
 /**
  * Get port from environment and store in Express.
@@ -90,4 +84,4 @@ function onListening() {
   log.info(`httpd listening on port ${port}`);
 }
 
-module.exports = server;
+export default server;

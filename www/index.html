@@ -1435,6 +1435,10 @@
     }
 
     const podAddToQueue = () => {
+      // TODO: replace mpdCmd with podcastAddToQueue(episodeName,url)
+      // podcastAddToQueue
+      //   got url to file /podcast/downloads/episodeName.mp3
+      //   mpdCmd('add', file)
       liSelected.map(el => mpdCmd('add', [encodeURIComponent(feed[el].url)]));
       initLiSelected();
     }

@@ -1,11 +1,10 @@
-const log = require('../logger')
-const mpd = require('../mpd')
-const cfg = require('config');
-const cfgfile = require('../cfgfile');
-const fs = require('fs');
-
-const { spawn } = require("child_process");
-const { resolve } = require('path');
+import log from '../logger/logger.js';
+import mpd from '../mpd/mpd.js';
+import cfg from 'config';
+import cfgfile from '../cfgfile/cfgfile.js';
+import fs from 'fs';
+import { spawn } from "child_process";
+// const { resolve } from 'path');
 
 var bth = {};
 
@@ -31,7 +30,7 @@ const saveVolume = (value) => {
   if (!content.bt) content.bt = {};
   if (!content.bt.defaultVolume) content.bt.defaultVolume = [];
   let devFound = false;
-  for (dev of content.bt.defaultVolume)
+  for (let dev of content.bt.defaultVolume)
     if (dev.address === bth.status.connected.address) {
       devFound = true;
       dev.volume = value;
@@ -47,7 +46,7 @@ const saveVolumeInc = (value) => {
   if (!content.bt) content.bt = {};
   if (!content.bt.defaultVolume) content.bt.defaultVolume = [];
   let devFound = false;
-  for (dev of content.bt.defaultVolume)
+  for (let dev of content.bt.defaultVolume)
     if (dev.address === bth.status.connected.address) {
       devFound = true;
       dev.volume = `${parseInt(dev.volume.split('%')[0]) + value}%`;
@@ -74,14 +73,14 @@ const volumeInc = async () => {
     if (volCtrl && volLev != "100%") {
       let volCtrlStr = `"${volCtrl}"`;
       let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, "1%+"]);
-      data = "";
+      let data = "";
       for await (const chunk of bthCmd.stdout)
         data += chunk;
-      error = "";
+      let error = "";
       for await (const chunk of bthCmd.stderr) {
         error += chunk;
       }
-      exitCode = await new Promise((resolve, reject) => {
+      let exitCode = await new Promise((resolve, reject) => {
         bthCmd.on('close', resolve);
       });
 
@@ -118,14 +117,14 @@ const volumeDec = async () => {
     if (volCtrl && volLev != "0%") {
       let volCtrlStr = `"${volCtrl}"`;
       let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, "1%-"]);
-      data = "";
+      let data = "";
       for await (const chunk of bthCmd.stdout)
         data += chunk;
-      error = "";
+      let error = "";
       for await (const chunk of bthCmd.stderr) {
         error += chunk;
       }
-      exitCode = await new Promise((resolve, reject) => {
+      let exitCode = await new Promise((resolve, reject) => {
         bthCmd.on('close', resolve);
       });
 
@@ -164,14 +163,14 @@ const volumeSet = async (value) => {
       let volCtrlStr = `"${volCtrl}"`;
       log.info(`new volume: ${volCtrlStr}: ${value}`);
       let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, value]);
-      data = "";
+      let data = "";
       for await (const chunk of bthCmd.stdout)
         data += chunk;
-      error = "";
+      let error = "";
       for await (const chunk of bthCmd.stderr) {
         error += chunk;
       }
-      exitCode = await new Promise((resolve, reject) => {
+      let exitCode = await new Promise((resolve, reject) => {
         bthCmd.on('close', resolve);
       });
 
@@ -188,22 +187,22 @@ const volumeSet = async (value) => {
           setTimeout(resolve, 2000);
         });
         let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, value]);
-        data = "";
+        let data = "";
         for await (const chunk of bthCmd.stdout)
           data += chunk;
         let volLevel = "";
-        for (line of data.toString().split('\n')) {
+        for (let line of data.toString().split('\n')) {
           if (line.toString().length < 2) continue;
           volLevel = line.toString();
         }
         if (volLevel.length > 5) {
           volLevel = volLevel.match(/\[(.*?)\]/)[1];
         }
-        error = "";
+        let error = "";
         for await (const chunk of bthCmd.stderr) {
           error += chunk;
         }
-        exitCode = await new Promise((resolve, reject) => {
+        let exitCode = await new Promise((resolve, reject) => {
           bthCmd.on('close', resolve);
         });
 
@@ -218,14 +217,14 @@ const volumeSet = async (value) => {
         else {
           log.info(`new volume: ${volCtrlStr}: ${value}`);
           let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, value]);
-          data = "";
+          let data = "";
           for await (const chunk of bthCmd.stdout)
             data += chunk;
-          error = "";
+          let error = "";
           for await (const chunk of bthCmd.stderr) {
             error += chunk;
           }
-          exitCode = await new Promise((resolve, reject) => {
+          let exitCode = await new Promise((resolve, reject) => {
             bthCmd.on('close', resolve);
           });
 
@@ -268,14 +267,14 @@ const volumeMute = async (val) => {
     if (volCtrl && volLev != "0%") {
       let volCtrlStr = `"${volCtrl}"`;
       let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, val]);
-      data = "";
+      let data = "";
       for await (const chunk of bthCmd.stdout)
         data += chunk;
-      error = "";
+      let error = "";
       for await (const chunk of bthCmd.stderr) {
         error += chunk;
       }
-      exitCode = await new Promise((resolve, reject) => {
+      let exitCode = await new Promise((resolve, reject) => {
         bthCmd.on('close', resolve);
       });
 
@@ -301,7 +300,7 @@ const deviceConnect = async (address) => {
       return;
     }
     // check for address in devices
-    for (dev of bth.status.devices) {
+    for (let dev of bth.status.devices) {
       if (dev.address === address) {
         foundDev = dev;
         break;
@@ -392,14 +391,14 @@ const deviceConnect = async (address) => {
     }
     // log.info(`finally connecting to ${address}`);
     const bthCmd = spawn("bluetoothctl", ["connect", address]);
-    data = "";
+    let data = "";
     for await (const chunk of bthCmd.stdout)
       data += chunk;
-    error = "";
+    let error = "";
     for await (const chunk of bthCmd.stderr) {
       error += chunk;
     }
-    exitCode = await new Promise((resolve, reject) => {
+    let exitCode = await new Promise((resolve, reject) => {
       bthCmd.on('close', resolve);
     });
 
@@ -417,7 +416,7 @@ const autoconnect = async () => {
   try {
     let content = cfgfile.read();
     if (content != {} && content.bt && content.bt.lastConnected) {
-      for (dev of bth.status.devices) {
+      for (let dev of bth.status.devices) {
         if (dev.address === content.bt.lastConnected && dev.online != undefined && dev.online === 'yes') {
           log.info(`autoconnect to ${content.bt.lastConnected}...`);
           await deviceConnect(content.bt.lastConnected);
@@ -479,7 +478,7 @@ const statusChange = ([attr, state]) => {
     let error = "";
     for await (const chunk of bthCmd.stderr)
       error += chunk;
-    const exitCode = await new Promise((resolve, reject) => {
+    let exitCode = await new Promise((resolve, reject) => {
       bthCmd.on('close', resolve);
     });
 
@@ -501,21 +500,21 @@ const amixerSconctrols = () => {
       reject("no devices connected");
       return;
     }
-    bthCmd = spawn("amixer", ["-D", "bluealsa", "scontrols"]);
-    data = "";
+    let bthCmd = spawn("amixer", ["-D", "bluealsa", "scontrols"]);
+    let data = "";
     for await (const chunk of bthCmd.stdout)
       data += chunk;
-    for (line of data.toString().split('\n')) {
+    for (let line of data.toString().split('\n')) {
       if (line.toString().includes("A2DP"))
         bth.status.connected.volCtrl = line.toString().split("'")[1];
       if (line.toString().includes("Battery"))
         bth.status.connected.batCtrl = line.toString().split("'")[1];
     }
-    error = "";
+    let error = "";
     for await (const chunk of bthCmd.stderr) {
       error += chunk;
     }
-    exitCode = await new Promise((resolve, reject) => {
+    let exitCode = await new Promise((resolve, reject) => {
       bthCmd.on('close', resolve);
     });
 
@@ -528,22 +527,22 @@ const amixerSconctrols = () => {
     // get battery
     if (bth.status.connected.batCtrl) {
       let batCtrl = `"${bth.status.connected.batCtrl}"`;
-      bthCmd = spawn("amixer", ["-D", "bluealsa", "sget", batCtrl]);
-      data = "";
+      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sget", batCtrl]);
+      let data = "";
       for await (const chunk of bthCmd.stdout)
         data += chunk;
       let batLevel = "";
-      for (line of data.toString().split('\n')) {
+      for (let line of data.toString().split('\n')) {
         if (line.toString().length < 2) continue;
         batLevel = line.toString();
       }
       if (batLevel.length > 5)
         bth.status.connected.battery = batLevel.match(/\[(.*?)\]/)[1];
-      error = "";
+      let error = "";
       for await (const chunk of bthCmd.stderr) {
         error += chunk;
       }
-      exitCode = await new Promise((resolve, reject) => {
+      let exitCode = await new Promise((resolve, reject) => {
         bthCmd.on('close', resolve);
       });
 
@@ -557,12 +556,12 @@ const amixerSconctrols = () => {
       // get playback volume
       if (bth.status.connected.volCtrl) {
         let volCtrl = `"${bth.status.connected.volCtrl}"`;
-        bthCmd = spawn("amixer", ["-D", "bluealsa", "sget", volCtrl]);
-        data = "";
+        let bthCmd = spawn("amixer", ["-D", "bluealsa", "sget", volCtrl]);
+        let data = "";
         for await (const chunk of bthCmd.stdout)
           data += chunk;
         let volLevel = "";
-        for (line of data.toString().split('\n')) {
+        for (let line of data.toString().split('\n')) {
           if (line.toString().length < 2) continue;
           volLevel = line.toString();
         }
@@ -570,11 +569,11 @@ const amixerSconctrols = () => {
           bth.status.connected.volume = volLevel.match(/\[(.*?)\]/)[1];
           bth.status.connected.mute = volLevel.match(/\[on\]/) ? "no" : "yes";
         }
-        error = "";
+        let error = "";
         for await (const chunk of bthCmd.stderr) {
           error += chunk;
         }
-        exitCode = await new Promise((resolve, reject) => {
+        let exitCode = await new Promise((resolve, reject) => {
           bthCmd.on('close', resolve);
         });
 
@@ -592,7 +591,7 @@ const amixerSconctrols = () => {
 const deviceRemove = async (address) => {
   return new Promise(async (resolve, reject) => {
     let foundDev = null;
-    for (dev of bth.status.devices)
+    for (let dev of bth.status.devices)
       if (dev.address === address) foundDev = dev;
     if (foundDev == null) {
       reject(`no devices with address ${foundDev.address}`);
@@ -622,7 +621,7 @@ const deviceRemove = async (address) => {
 
 const findConnectedDevice = () => {
   bth.status.connected = null;
-  for (dev of bth.status.devices)
+  for (let dev of bth.status.devices)
     if (dev.connected === "yes")
       bth.status.connected = dev;
   return bth.status.connected;
@@ -630,16 +629,16 @@ const findConnectedDevice = () => {
 
 const bluetoothctlInfoDevice = () => {
   return new Promise(async (resolve, reject) => {
-    for (dev of bth.status.devices) {
+    for (let dev of bth.status.devices) {
       if (dev.paired) delete dev.paired;
       if (dev.trusted) delete dev.trusted;
       if (dev.connected) delete dev.connected;
       if (dev.online) delete dev.online;
-      bthCmd = spawn("bluetoothctl", ["info", dev.address]);
-      data = "";
+      let bthCmd = spawn("bluetoothctl", ["info", dev.address]);
+      let data = "";
       for await (const chunk of bthCmd.stdout)
         data += chunk;
-      for (line of data.toString().split('\n')) {
+      for (let line of data.toString().split('\n')) {
         if (line.toString().includes("Paired"))
           dev.paired = line.toString().split(': ')[1];
         if (line.toString().includes("Trusted"))
@@ -659,11 +658,11 @@ const bluetoothctlInfoDevice = () => {
         if (line.toString().includes("RSSI"))
           dev.online = "yes";
       }
-      error = "";
+      let error = "";
       for await (const chunk of bthCmd.stderr) {
         error += chunk;
       }
-      exitCode = await new Promise((resolve, reject) => {
+      let exitCode = await new Promise((resolve, reject) => {
         bthCmd.on('close', resolve);
       });
 
@@ -685,7 +684,7 @@ const bluetoothctlDevice = () => {
     let data = "";
     for await (const chunk of bthCmd.stdout)
       data += chunk;
-    for (line of data.toString().split('\n')) {
+    for (let line of data.toString().split('\n')) {
       // example:
       // Device 01:15:21:47:16:D4 OneOdio A70 
       // but it also happened to be:
@@ -721,7 +720,7 @@ const bluetoothctlShow = () => {
     let data = "";
     for await (const chunk of bthCmd.stdout)
       data += chunk;
-    for (line of data.toString().split('\n')) {
+    for (let line of data.toString().split('\n')) {
       if (line.toString().includes("Controller"))
         bth.status.Controller = line.toString().split(' ')[1];
       if (line.toString().includes("Powered"))
@@ -733,7 +732,7 @@ const bluetoothctlShow = () => {
     for await (const chunk of bthCmd.stderr) {
       error += chunk;
     }
-    const exitCode = await new Promise((resolve, reject) => {
+    let exitCode = await new Promise((resolve, reject) => {
       bthCmd.on('close', resolve);
     });
 
@@ -819,7 +818,7 @@ const saveLastDeviceConnected = async (address) => {
 const setDefaultVolume = async (address) => {
   let content = cfgfile.read();
   if (content.bt.defaultVolume) {
-    for (dev of content.bt.defaultVolume)
+    for (let dev of content.bt.defaultVolume)
       if (dev.address === address) {
         await volumeSet(dev.volume);
       }
@@ -888,7 +887,7 @@ const btMngr = async () => {
 log.info("starting bluetooth mngr...")
 btMngr();
 
-module.exports = {
+export default {
   status: () => { return bth.status; },
   power: (val) => statusChange(["power", val]),
   deviceConnect: (address) => {

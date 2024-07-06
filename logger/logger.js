@@ -1,6 +1,6 @@
-const winston = require('winston');
-const config = require('config'); 
-const packageJSON = require("../package.json");
+import winston from 'winston';
+import config from 'config'; 
+import packageJSON from "../package.json" assert {type: 'json'};
 
 const console_log = config.get('logger.console_log');
 
@@ -65,4 +65,4 @@ if (console_log === "ON") {
   })
 }
 
-module.exports = logger;
+export default logger;

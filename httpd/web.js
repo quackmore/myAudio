@@ -1,16 +1,14 @@
-const express = require('express');
-const path = require('path');
-// const cookieParser = require('cookie-parser');
-const morgan = require('morgan');
+import express from 'express';
+import path from 'path';
+import morgan from 'morgan';
 
-const btRouter = require('../api/bt');
-const cfgFile = require('../api/cfgFile');
-const homeRouter = require('../api/home');
-const mpdRouter = require('../api/mpd');
-const podcastRouter = require('../api/podcast');
-const speakersRouter = require('../api/speakers');
-const streamRouter = require('../api/stream');
-const req = require('express/lib/request');
+import btRouter from '../api/bt/bt.route.js';
+import cfgFile from '../api/cfgFile/cfgFile.route.js';
+import homeRouter from '../api/home/home.route.js';
+import mpdRouter from '../api/mpd/mpd.route.js';
+import podcastRouter from '../api/podcast/podcast.route.js';
+import speakersRouter from '../api/speakers/speakers.route.js';
+import streamRouter from '../api/stream/stream.route.js';
 
 const web = express();
 
@@ -32,4 +30,4 @@ web.use('/podcast', podcastRouter);
 web.use('/speakers', speakersRouter);
 web.use('/stream', streamRouter);
 
-module.exports = web;
+export default web;

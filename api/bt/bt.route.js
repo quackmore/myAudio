@@ -1,5 +1,6 @@
-const express = require('express');
-const bt = require('../../bt');
+import express from 'express';
+import bt from '../../bt/bt.js';
+
 const router = express.Router();
 
 router.get('/status', async function (req, res, next) {
@@ -57,4 +58,4 @@ router.post('/volume/mute/:val', async function (req, res, next) {
     .catch(err => res.status(500).send(err.message));
 });
 
-module.exports = router;
+export default router;

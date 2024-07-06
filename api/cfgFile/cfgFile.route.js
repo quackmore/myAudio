@@ -1,5 +1,6 @@
-const express = require('express');
-const cfg = require('../../cfgfile');
+import express from 'express';
+import cfg from '../../cfgfile/cfgfile.js';
+
 const router = express.Router();
 
 router.get('/', async function (req, res, next) {
@@ -20,4 +21,4 @@ router.post('/', async function (req, res, next) {
   }
 });
 
-module.exports = router;
+export default router;

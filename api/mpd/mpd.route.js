@@ -1,5 +1,6 @@
-const express = require('express');
-const mpd = require('../../mpd');
+import express from 'express';
+import mpd from '../../mpd/mpd.js';
+
 const router = express.Router();
 
 router.get('/status', async function (req, res, next) {
@@ -46,4 +47,4 @@ router.post('/output/:opt1?/:opt2?', async function (req, res, next) {
   }
 });
 
-module.exports = router;
+export default router;

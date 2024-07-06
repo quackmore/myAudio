@@ -1,15 +1,15 @@
-const mpd = require('mpd');
+import mpd from 'mpd';
 const cmd = mpd.cmd;
-const { resolve } = require('path');
-const log = require('../logger');
-const { spawn } = require("child_process");
-const cfg = require('config');
+// import { resolve } from 'path';
+import log from '../logger/logger.js';
+import { spawn } from "child_process";
+import cfg from 'config';
 
 var mpdSt = {};
 
 function parseObj(txt) {
   let obj = {};
-  for (item of txt.split('\n'))
+  for (let item of txt.split('\n'))
     if (item !== '') {
       let [key, ...val] = item.split(':');
       obj[key.replace(/[ -]/g, '')] = val.toString().trimStart();
@@ -20,7 +20,7 @@ function parseObj(txt) {
 function parseArrayOfObj(txt) {
   let array = [];
   let song = {};
-  for (item of txt.split('\n')) {
+  for (let item of txt.split('\n')) {
     if (item === '') continue;
     if ((item.startsWith('file') || item.startsWith('directory') || item.startsWith('playlist') || item.startsWith('outputid')) && Object.keys(song).length !== 0) {
       array.push(song);
@@ -83,7 +83,7 @@ async function listinfo(info, options) {
 async function output(options) {
   try {
     let data = await playCmd('outputs', []);
-    outputs = parseArrayOfObj(data);
+    let outputs = parseArrayOfObj(data);
     if (options.length == 0)
       return outputs;
     switch (options[0]) {
@@ -182,14 +182,14 @@ function connect() {
 async function start() {
   log.info("starting mpd...");
   let mpdCmd = spawn("mpd", []);
-  data = "";
+  let data = "";
   for await (const chunk of mpdCmd.stdout)
     data += chunk;
-  error = "";
+  let error = "";
   for await (const chunk of mpdCmd.stderr) {
     error += chunk;
   }
-  exitCode = await new Promise((resolve, reject) => {
+  let exitCode = await new Promise((resolve, reject) => {
     mpdCmd.on('close', resolve);
   });
 
@@ -207,14 +207,14 @@ async function end() {
   await playCmd('stop', []);
   log.info("ending mpd...");
   let mpdCmd = spawn("mpd", ["--kill"]);
-  data = "";
+  let data = "";
   for await (const chunk of mpdCmd.stdout)
     data += chunk;
-  error = "";
+  let error = "";
   for await (const chunk of mpdCmd.stderr) {
     error += chunk;
   }
-  exitCode = await new Promise((resolve, reject) => {
+  let exitCode = await new Promise((resolve, reject) => {
     mpdCmd.on('close', resolve);
   });
 
@@ -229,14 +229,14 @@ async function end() {
 async function restart() {
   log.info("restarting mpd...");
   let mpdCmd = spawn("mpd --kill && mpd", { shell: true });
-  data = "";
+  let data = "";
   for await (const chunk of mpdCmd.stdout)
     data += chunk;
-  error = "";
+  let error = "";
   for await (const chunk of mpdCmd.stderr) {
     error += chunk;
   }
-  exitCode = await new Promise((resolve, reject) => {
+  let exitCode = await new Promise((resolve, reject) => {
     mpdCmd.on('close', resolve);
   });
 
@@ -248,7 +248,7 @@ async function restart() {
     log.info("mpd restarted");
 }
 
-module.exports = {
+export default {
   status: updateStatus,
   playCmd: playCmd,
   listinfo: listinfo,

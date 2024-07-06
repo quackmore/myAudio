@@ -1,11 +1,12 @@
-const pkg = require('../package.json');
-const cfg = require('config');
+import pkg from '../package.json' assert {type: 'json'};
+import cfg from 'config';
+import os from 'node:os';
 
 const cfgFilesRoot = () => {
   if (cfg.has('player.cfgFilesRoot'))
     return cfg.get('player.cfgFilesRoot') + "/." + pkg.name;
   else
-    return require('os').homedir() + "/." + pkg.name;
+    return os.homedir() + "/." + pkg.name;
 }
 
-module.exports = cfgFilesRoot;
+export default cfgFilesRoot;

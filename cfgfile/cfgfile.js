@@ -1,10 +1,10 @@
-const log = require('../logger')
-const path = require('path');
-const fs = require('fs');
-const cfgFilesRoot = require('../utils/cfgFilesRoot');
+import log from '../logger/logger.js';
+import path from 'path';
+import fs from 'fs';
+import cfgFilesRoot from '../utils/cfgFilesRoot.js';
 
 
-module.exports = {
+export default {
   init: () => {
     try {
       if (!fs.existsSync(cfgFilesRoot())) {

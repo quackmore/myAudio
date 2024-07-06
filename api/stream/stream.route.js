@@ -1,9 +1,9 @@
-const express = require('express');
-const cfg = require('config');
-const log = require('../../logger');
-const fs = require('fs');
-const cfgFilesRoot = require('../../utils/cfgFilesRoot');
-const path = require('path');
+import express from 'express';
+import cfg from 'config';
+import log from '../../logger/logger.js';
+import fs from 'fs';
+import cfgFilesRoot from '../../utils/cfgFilesRoot.js';
+import path from 'path';
 
 const streamsFile = path.join(cfgFilesRoot(), "/streams/streams.json");
 const router = express.Router();
@@ -48,4 +48,4 @@ router.post('/deleteStreamingPlaylist', async function (req, res, next) {
   }
 });
 
-module.exports = router;
+export default router;
