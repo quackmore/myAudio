@@ -11,7 +11,7 @@ router.get('/', async function (req, res, next) {
 
 router.post('/', async function (req, res, next) {
   cfgFile.save(req.body)
-    .then(res.sendStatus(200))
+    .then(() => res.sendStatus(200))
     .catch(err => res.status(500).send(err));
 });
 

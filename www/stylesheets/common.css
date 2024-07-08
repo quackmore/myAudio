@@ -154,6 +154,13 @@ body {
     color: whitesmoke;
 }
 
+.infoLine {
+    margin: 0;
+    padding: 0;
+    font-size: medium;
+    background-color: lightblue;
+}
+
 .tabrow {
     text-align: left;
     list-style: none;

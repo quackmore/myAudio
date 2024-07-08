@@ -10,8 +10,9 @@
         "bt_output": "bth-speaker",
         "alsaCfgFile": "/home/flintheart/.asoundrc",
         "streamingPlaylist": "/home/flintheart/.config/mpd/playlists/streaming.m3u",
-        "streamingReconnectTimeout": 2000,
-        "streamingReconnectCount": 5
+        "streamingReconnectTimeout": 10000,
+        "streamingReconnectCount": 6,
+        "podcastDownloads": "/media/verbatim-ntfs/Music"
     },
     "speakers": {
         "contactDevice": "192.168.1.211",

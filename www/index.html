@@ -188,6 +188,7 @@
       <button class="cmdBtn" onclick="podModCancel()">cancel</button>
       <button class="cmdBtn" onclick="podModSave()">save</button>
     </div>
+    <div class="cmdLine" id="downloadingfiles" style="display: none;"> </div>
     <div class="cmdLine" id="podcastSelectCmds" style="display: none;">
       <button class="cmdBtn" onclick="podAddToQueue()">add to queue</button>
       <button class="cmdBtn" onclick="podSelCancel()">cancel</button>
@@ -874,7 +875,10 @@
           res.desc = `${item.file.replaceAll(',', ':')}`;
       } else {
         if (!item.hasOwnProperty('Artist')) item.Artist = item.AlbumArtist;
-        res.desc = `${item.Artist} - ${item.Album} - ${item.Title}`;
+        if (item.Artist == undefined && item.Album == undefined && item.Title == undefined)
+          res.desc = item.file;
+        else
+          res.desc = `${(item.Artist == undefined) ? '' : item.Artist}${(item.Album == undefined ? '' : ' - ' + item.Album)}${(item.Title == undefined) ? '' : ' - ' + item.Title}`;
       }
       if (player.mpd.hasOwnProperty('curSong') &&
         player.mpd.curSong.file === item.file) {
@@ -1434,13 +1438,41 @@
       });
     }
 
+    const rmDownloadingFile = (name) => {
+      toutFetch(`/podcast/remove/downloadingFile/${encodeURIComponent(name)}`, 5000, { method: 'POST' })
+        .catch(err => alert(err.message));
+    }
+
+    const showDownloadingFiles = () => {
+      toutFetch(`/podcast/downloadingfiles`, 5000)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.length > 0) {
+            let downloadingfiles = "";
+            // data.map(el => downloadingfiles += `<p class="infoLine">${el.name} - ${el.progress} <i onclick="rmDownloadingFile('${el.name}')" class="fa-regular fa-xmark actC"></i></p>`);
+            data.map(el => downloadingfiles += `<p class="infoLine">${el.name} - ${el.progress.includes('FAILED') ? '<i onclick="rmDownloadingFile(' + '\'' + el.name + '\')" class="fa-regular fa-xmark actC"></i>' : el.progress} </p>`);
+            document.getElementById('downloadingfiles').innerHTML = downloadingfiles;
+            if (document.getElementById('downloadingfiles').style.display === "none")
+              document.getElementById('downloadingfiles').style.display = "block";
+            setTimeout(showDownloadingFiles, 1000);
+          } else {
+            document.getElementById('downloadingfiles').style.display = "none";
+          }
+        })
+        .catch(err => alert(err.message))
+    }
+
     const podAddToQueue = () => {
-      // TODO: replace mpdCmd with podcastAddToQueue(episodeName,url)
-      // podcastAddToQueue
-      //   got url to file /podcast/downloads/episodeName.mp3
-      //   mpdCmd('add', file)
-      liSelected.map(el => mpdCmd('add', [encodeURIComponent(feed[el].url)]));
-      initLiSelected();
+      loadSpinner();
+      liSelected.map(el => {
+        toutFetch(`/podcast/add/filename/${encodeURIComponent(feed[el].title)}/url/${encodeURIComponent(feed[el].url)}`, 60000, { method: 'POST' })
+          .then(() => {
+            initLiSelected();
+            setTimeout(showDownloadingFiles, 500);
+          })
+          .catch(err => alert(err.message))
+          .finally(() => unloadSpinner());
+      });
     }
 
     // STARTUP

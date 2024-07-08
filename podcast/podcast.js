@@ -2,8 +2,16 @@ import RSSParser from 'rss-parser';
 import fs from 'fs';
 import log from '../logger/logger.js';
 import cfgFilesRoot from '../utils/cfgFilesRoot.js';
+import cfg from 'config';
 import path from 'path';
 import got from 'got';
+import stream from 'stream';
+import { promisify } from 'util';
+import mpd from '../mpd/mpd.js';
+
+const pipeline = promisify(stream.pipeline);
+
+
 const podcastsFile = path.join(cfgFilesRoot(), "/podcasts/podcasts.json");
 
 async function getList() {
@@ -43,40 +51,62 @@ async function getEpisodes(feedUrl) {
   })
 }
 
-// const { createWriteStream } from "fs");
-// const stream from "stream");
-// const { promisify } from "util");
-// const pipeline = promisify(stream.pipeline);
-// 
-// const url = "https://media0.giphy.com/media/4SS0kfzRqfBf2/giphy.gif";
-// const fileName = "image.gif";
-// 
-// const downloadStream = got.stream(url);
-// const fileWriterStream = createWriteStream(fileName);
-// 
-// downloadStream.on("downloadProgress", ({ transferred, total, percent }) => {
-//   const percentage = Math.round(percent * 100);
-//   console.error(`progress: ${transferred}/${total} (${percentage}%)`);
-// });
-// 
-// pipeline(downloadStream, fileWriterStream)
-//   .then(() => console.log(`File downloaded to ${fileName}`))
-//   .catch((error) => console.error(`Something went wrong. ${error.message}`));
-// async function addEpisodeToQueue(filename, url) {
-//   return new Promise(async (resolve, reject) => {
-//     try {
-//       let parser = new RSSParser();
-//       let feed = await parser.parseURL(feedUrl);
-//       resolve(feed.items.map(item => ({ title: item.title, url: item.enclosure.url, duration: item.itunes.duration, contentSnippet: item.contentSnippet, date: item.isoDate.substring(0, 10) })));
-//     } catch (err) {
-//       log.error(err.message)
-//       reject(err.message);
-//     }
-//   })
-// }
+var downloadingFiles = [];
+
+function updateMpdQUeue(file) {
+  mpd.playCmd('add', [file])
+    .catch(err => { log.error(err.message) });
+}
+
+async function addFileToQueue(name, url) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      let fileName = path.join(cfg.get('player.podcastDownloads'), `podcasts/${name}.mp3`);
+      if (!fs.existsSync(fileName)) {
+        const downloadStream = got.stream(url);
+        const fileWriterStream = fs.createWriteStream(fileName);
+        downloadingFiles.push({ name: name, progress: '[0%]' })
+        downloadStream.on("downloadProgress", ({ transferred, total, percent }) => {
+          const percentage = Math.round(percent * 100);
+          // percentage info is enough
+          // downloadingFiles.find(el => el.name === name).progress = `${transferred}/${total} (${percentage}%)`;
+          downloadingFiles.find(el => el.name === name).progress = `[${percentage}%]`;
+        });
+        downloadStream.on("end", () => {
+          downloadingFiles = downloadingFiles.filter(el => el.name !== name);
+          log.info(`downloaded ${fileName} from ${url}`);
+          mpd.playCmd('update', ['podcasts'])
+            .then(() => setTimeout(updateMpdQUeue, 2000, `podcasts/${name}.mp3`))
+            .catch(err => { log.error(err.message) });
+        });
+        downloadStream.on("error", (error) => {
+          downloadingFiles.find(el => el.name === name).progress += ' - FAILED';
+          log.error(`download of ${fileName} from ${url} failed`);
+        });
+        // don't wait for completion, use listDownloadingFiles for checking 
+        // the download status
+        // await pipeline(downloadStream, fileWriterStream);
+        pipeline(downloadStream, fileWriterStream);
+      }
+      resolve('done');
+    } catch (err) {
+      log.error(err.message)
+      reject(err.message);
+    }
+  })
+}
+
+function listDownloadingFiles() { return downloadingFiles; }
+
+function rmDownloadingFile(name) {
+  downloadingFiles = downloadingFiles.filter(el => el.name !== name);
+}
 
 export default {
   getList: getList,
   saveList: saveList,
-  getEpisodes: getEpisodes
+  getEpisodes: getEpisodes,
+  addFileToQueue: addFileToQueue,
+  listDownloadingFiles: listDownloadingFiles,
+  rmDownloadingFile: rmDownloadingFile
 }
