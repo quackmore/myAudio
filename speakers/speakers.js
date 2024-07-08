@@ -90,7 +90,7 @@ function saveVolumeInc(value) {
 
 async function volumeSet(value) {
   let spkrsCmd = spawn("amixer", ["-c", cfg.get('speakers.card'), "sset", cfg.get('speakers.volumeCtrl'), value]);
-  data = "";
+  let data = "";
   for await (const chunk of spkrsCmd.stdout)
     data += chunk;
   let error = "";
@@ -116,7 +116,7 @@ async function volumeInc() {
   let speakers = await volumeGet();
   if (speakers.volume != "100%") {
     let spkrsCmd = spawn("amixer", ["-c", cfg.get('speakers.card'), "sset", cfg.get('speakers.volumeCtrl'), "1%+"]);
-    data = "";
+    let data = "";
     for await (const chunk of spkrsCmd.stdout)
       data += chunk;
     let error = "";
@@ -142,7 +142,7 @@ async function volumeDec() {
   let speakers = await volumeGet();
   if (speakers.volume != "100%") {
     let spkrsCmd = spawn("amixer", ["-c", cfg.get('speakers.card'), "sset", cfg.get('speakers.volumeCtrl'), "1%-"]);
-    data = "";
+    let data = "";
     for await (const chunk of spkrsCmd.stdout)
       data += chunk;
     let error = "";
@@ -168,7 +168,7 @@ async function volumeMute(val) {
   if (val !== "mute" && val !== "unmute") return "invalid command";
   // val = "mute" || "unmute"
   let spkrsCmd = spawn("amixer", ["-c", cfg.get('speakers.card'), "sset", cfg.get('speakers.volumeCtrl'), val]);
-  data = "";
+  let data = "";
   for await (const chunk of spkrsCmd.stdout)
     data += chunk;
   let error = "";
