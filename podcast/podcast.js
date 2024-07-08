@@ -61,6 +61,7 @@ function updateMpdQUeue(file) {
 async function addFileToQueue(name, url) {
   return new Promise(async (resolve, reject) => {
     try {
+      name = name.replaceAll(':', ',');
       let fileName = path.join(cfg.get('player.podcastDownloads'), `podcasts/${name}.mp3`);
       if (!fs.existsSync(fileName)) {
         const downloadStream = got.stream(url);
@@ -101,6 +102,20 @@ function listDownloadingFiles() { return downloadingFiles; }
 function rmDownloadingFile(name) {
   downloadingFiles = downloadingFiles.filter(el => el.name !== name);
 }
+
+function rmOldEpisodes() {
+  let podDir = path.join(cfg.get('player.podcastDownloads'), 'podcasts');
+  try {
+    if (!fs.existsSync(podDir)) return;
+    fs.readdirSync(podDir).map(fileName => {
+      console.log(fs.statSync(path.join(cfg.get('player.podcastDownloads'), `podcasts/${fileName}`)).mtimeMs);
+    });
+  } catch (err) {
+    log.error(err.message);
+  }
+}
+
+// rmOldEpisodes();
 
 export default {
   getList: getList,

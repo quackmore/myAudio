@@ -464,19 +464,26 @@
         playerDefault();
         return;
       }
-      if (player.mpd.curSong) {
+      if (player.mpd.hasOwnProperty('curSong')) {
+        let curSong = player.mpd.curSong;
         let desc = "";
-        if (player.mpd.curSong.file.startsWith('http')) {
-          if (player.mpd.curSong.hasOwnProperty('Name'))
-            desc = `${player.mpd.curSong.Name}`;
+        if (curSong.file.startsWith('http')) {
+          // stream
+          if (curSong.hasOwnProperty('Name'))
+            desc = `${curSong.Name}`;
           else
-            desc = `${player.mpd.curSong.file.replaceAll(',', ':')}`;
+            desc = `${curSong.file.replaceAll(',', ':')}`;
         } else {
-          if (!player.mpd.curSong.Artist)
-            player.mpd.curSong.Artist = player.mpd.curSong.AlbumArtist;
-          desc = `${player.mpd.curSong.Artist} - ${player.mpd.curSong.Title} [${player.mpd.curSong.Album}]`;
-          if (desc.length > 58)
-            desc = `<center>${player.mpd.curSong.Artist}</center>\n<center>${player.mpd.curSong.Title}</center>\n<center>[${player.mpd.curSong.Album}]</center>`;
+          // file
+          if (!curSong.hasOwnProperty('Artist')) curSong.Artist = curSong.AlbumArtist;
+          if (curSong.Artist == undefined && curSong.Album == undefined && curSong.Title == undefined)
+            desc = curSong.file;
+          else {
+            desc = `${curSong.Artist == undefined ? '' : curSong.Artist}${curSong.Title == undefined ? '' : ' - ' + curSong.Title}${curSong.Album == undefined ? '' : ' - [' + curSong.Album + ']'}`;
+            if (desc.length > 58)
+              desc = `<center>${curSong.Artist == undefined ? '' : curSong.Artist}</center>\n<center>${curSong.Title == undefined ? '' : curSong.Title}</center>\n<center>${curSong.Album == undefined ? '' : '[' + curSong.Album + ']'}</center>`;
+            if (desc.startsWith(' - ')) desc = desc.slice(3);
+          }
         }
         document.getElementById('song').innerHTML = desc;
       }
@@ -877,8 +884,10 @@
         if (!item.hasOwnProperty('Artist')) item.Artist = item.AlbumArtist;
         if (item.Artist == undefined && item.Album == undefined && item.Title == undefined)
           res.desc = item.file;
-        else
-          res.desc = `${(item.Artist == undefined) ? '' : item.Artist}${(item.Album == undefined ? '' : ' - ' + item.Album)}${(item.Title == undefined) ? '' : ' - ' + item.Title}`;
+        else {
+          res.desc = `${item.Artist == undefined ? '' : item.Artist}${item.Album == undefined ? '' : ' - ' + item.Album}${item.Title == undefined ? '' : ' - ' + item.Title}`;
+          if (res.desc.startsWith(' - ')) res.desc = res.desc.slice(3);
+        }
       }
       if (player.mpd.hasOwnProperty('curSong') &&
         player.mpd.curSong.file === item.file) {

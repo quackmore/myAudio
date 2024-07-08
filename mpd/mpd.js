@@ -152,14 +152,19 @@ function connect() {
       .then(() => {
         if (mpdSt.status) {
           // on streaming pause stop the player (clean the cache)
-          if (mpdSt.curSong.file.startsWith('http')
+          if (mpdSt.hasOwnProperty('curSong')
+            && mpdSt.curSong.hasOwnProperty('file')
+            && mpdSt.curSong.file.startsWith('http')
             && mpdSt.status.state === 'pause') {
             playCmd('stop', []);
           }
           // on streaming errors retry connection
           if (mpdSt.status.error) {
             log.error(mpdSt.status.error);
-            if (mpdSt.curSong.file.startsWith('http') && mpdSt.status.state === 'stop') {
+            if (mpdSt.hasOwnProperty('curSong')
+              && mpdSt.curSong.hasOwnProperty('file')
+              && mpdSt.curSong.file.startsWith('http')
+              && mpdSt.status.state === 'stop') {
               if (streamPlayRetry < cfg.get('player.streamingReconnectCount')) {
                 streamPlayRetry++;
                 log.info(`will try to reconnect [${streamPlayRetry}] to stream in ${(cfg.get('player.streamingReconnectTimeout')) * streamPlayRetry / 1000} secs...`);
@@ -168,7 +173,9 @@ function connect() {
             }
           }
           // on streaming playing
-          if (mpdSt.curSong.file.startsWith('http')
+          if (mpdSt.hasOwnProperty('curSong')
+            && mpdSt.curSong.hasOwnProperty('file')
+            && mpdSt.curSong.file.startsWith('http')
             && mpdSt.status.state === 'play') {
             streamPlayRetry = 0;
           }
