@@ -106,16 +106,23 @@ function rmDownloadingFile(name) {
 function rmOldEpisodes() {
   let podDir = path.join(cfg.get('player.podcastDownloads'), 'podcasts');
   try {
+    let now = new Date().getTime();
     if (!fs.existsSync(podDir)) return;
     fs.readdirSync(podDir).map(fileName => {
-      console.log(fs.statSync(path.join(cfg.get('player.podcastDownloads'), `podcasts/${fileName}`)).mtimeMs);
+      let fullFileName = path.join(cfg.get('player.podcastDownloads'), `podcasts/${fileName}`);
+      let fileTs = fs.statSync(fullFileName).mtimeMs;
+      if ((now - fileTs) > (86400 * cfg.get('player.podcastRemovedAfterDays')))
+        fs.unlink(fullFileName, (err) => {
+          if (err) log.error(err);
+          log.info(`${fullFileName} was deleted`);
+        });
     });
   } catch (err) {
     log.error(err.message);
   }
 }
 
-// rmOldEpisodes();
+rmOldEpisodes();
 
 export default {
   getList: getList,
