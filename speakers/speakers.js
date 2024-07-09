@@ -72,20 +72,19 @@ async function volumeGet() {
   return speakers;
 }
 
-function saveVolume(value) {
-  let content = cfgfile.read();
-  if (!content.spkrs) content.spkrs = {};
-  if (content.spkrs.defaultVolume)
-    content.spkrs.defaultVolume = value;
+async function saveVolume(value) {
+  let content = await cfgfile.read();
+  if (!content.hasOwnProperty('spkrs')) content.spkrs = {};
+  content.spkrs.defaultVolume = value;
   cfgfile.save(content);
 }
 
-function saveVolumeInc(value) {
-  let content = cfgfile.read();
-  if (!content.spkrs) content.spkrs = {};
-  if (content.spkrs.defaultVolume)
+async function saveVolumeInc(value) {
+  let content = await cfgfile.read();
+  if (content.hasOwnProperty('spkrs') && content.spkrs.hasOwnProperty('defaultVolume')) {
     content.spkrs.defaultVolume = `${parseInt(content.spkrs.defaultVolume.split('%')[0]) + value}%`;
-  cfgfile.save(content);
+    cfgfile.save(content);
+  }
 }
 
 async function volumeSet(value) {

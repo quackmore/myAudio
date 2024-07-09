@@ -673,14 +673,14 @@
           method: 'POST'
         })
           .then(() => refreshPlayerStatus())
-          .catch((err) => alert(`Failed to increment speakers volume - ${err.message}`));
+          .catch((err) => alert(`Failed to increase speakers volume - ${err.message}`));
       } else {
         if (player.bt.connected == null) return;
         toutFetch(`/bt/volume/inc`, 60000, {
           method: 'POST'
         })
           .then(() => refreshPlayerStatus())
-          .catch((err) => alert(`Failed to set ${player.bt.connected.name} volume to ${vol} - ${err.message}`));
+          .catch((err) => alert(`Failed to increase ${player.bt.connected.name} volume - ${err.message}`));
       }
     }
 
@@ -691,14 +691,14 @@
           method: 'POST'
         })
           .then(() => refreshPlayerStatus())
-          .catch((err) => alert(`Failed to increment speakers volume - ${err.message}`));
+          .catch((err) => alert(`Failed to decrease speakers volume - ${err.message}`));
       } else {
         if (player.bt.connected == null) return;
         toutFetch(`/bt/volume/dec`, 60000, {
           method: 'POST'
         })
           .then(() => refreshPlayerStatus())
-          .catch((err) => alert(`Failed to set ${player.bt.connected.name} volume to ${vol} - ${err.message}`));
+          .catch((err) => alert(`Failed to decrease ${player.bt.connected.name} volume - ${err.message}`));
       }
     }
 

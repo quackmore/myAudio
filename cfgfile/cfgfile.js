@@ -9,7 +9,7 @@ function init() {
       fs.mkdirSync(cfgFilesRoot());
     }
   } catch (err) {
-    log.error(err.message);
+    log.error(err);
   }
 }
 
@@ -19,12 +19,12 @@ function read() {
       let file_content = fs.readFileSync(path.join(cfgFilesRoot(), "config.json"));
       resolve(JSON.parse(file_content));
     } catch (err) {
-      log.error(err.message)
+      log.error(err)
       if (err.code === 'ENOENT') {
         try {
           fs.writeFileSync(path.join(cfgFilesRoot(), "config.json"), JSON.stringify({}, null, 4));
         } catch (err) {
-          log.error(err.message)
+          log.error(err)
         }
       }
       reject(err.message);
@@ -37,7 +37,7 @@ function save(content) {
     try {
       fs.writeFileSync(path.join(cfgFilesRoot(), "config.json"), JSON.stringify(content, null, 4));
     } catch (err) {
-      log.error(err.message)
+      log.error(err)
     }
   })
 }

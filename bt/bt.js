@@ -24,11 +24,11 @@ const devName = (dev) => {
     return `${dev.hasOwnProperty('name') ? dev.name : dev.address}`;
 }
 
-const saveVolume = (value) => {
+const saveVolume = async (value) => {
   if (!(bth.status.connected.hasOwnProperty('address'))) return;
-  let content = cfgfile.read();
-  if (!content.bt) content.bt = {};
-  if (!content.bt.defaultVolume) content.bt.defaultVolume = [];
+  let content = await cfgfile.read();
+  if (!content.hasOwnProperty('bt')) content.bt = {};
+  if (!content.bt.hasOwnProperty('defaultVolume')) content.bt.defaultVolume = [];
   let devFound = false;
   for (let dev of content.bt.defaultVolume)
     if (dev.address === bth.status.connected.address) {
@@ -40,18 +40,19 @@ const saveVolume = (value) => {
   cfgfile.save(content);
 }
 
-const saveVolumeInc = (value) => {
+const saveVolumeInc = async (value) => {
   if (!(bth.status.connected.hasOwnProperty('address'))) return;
-  let content = cfgfile.read();
-  if (!content.bt) content.bt = {};
-  if (!content.bt.defaultVolume) content.bt.defaultVolume = [];
+  let content = await cfgfile.read();
+  if (!content.hasOwnProperty('bt')) content.bt = {};
+  if (!content.bt.hasOwnProperty('defaultVolume')) content.bt.defaultVolume = [];
   let devFound = false;
   for (let dev of content.bt.defaultVolume)
     if (dev.address === bth.status.connected.address) {
       devFound = true;
       dev.volume = `${parseInt(dev.volume.split('%')[0]) + value}%`;
+      cfgfile.save(content);
+      break;
     }
-  if (devFound) cfgfile.save(content);
 }
 
 const volumeInc = async () => {
@@ -414,8 +415,8 @@ const deviceConnect = async (address) => {
 
 const autoconnect = async () => {
   try {
-    let content = cfgfile.read();
-    if (content != {} && content.bt && content.bt.lastConnected) {
+    let content = await cfgfile.read();
+    if (content.hasOwnProperty('bt') && content.bt.hasOwnProperty('lastConnected')) {
       for (let dev of bth.status.devices) {
         if (dev.address === content.bt.lastConnected && dev.online != undefined && dev.online === 'yes') {
           log.info(`autoconnect to ${content.bt.lastConnected}...`);
@@ -423,9 +424,8 @@ const autoconnect = async () => {
         }
       }
     }
-  }
-  catch (err) {
-    log.error(err.message);
+  } catch (err) {
+    log.error(err);
   }
 }
 
@@ -789,7 +789,7 @@ const updateAlsaBtCfg = async (address) => {
   try {
     file_content = fs.readFileSync(cfg.get('player.alsaCfgFile')).toString();
   } catch (err) {
-    log.error(err.message)
+    log.error(err)
     return;
   }
   if (file_content.includes(address)) return;
@@ -800,15 +800,14 @@ const updateAlsaBtCfg = async (address) => {
     await mpd.restart();
     log.info(`device ${address} added to alsa cfg file ${cfg.get('player.alsaCfgFile')}`);
   } catch (err) {
-    log.error(err.message)
+    log.error(err)
   }
 }
 
 const saveLastDeviceConnected = async (address) => {
-  let content = cfgfile.read();
-  if (!content.bt) content.bt = {};
-  if (!content.bt.lastConnected) content.bt.lastConnected = "";
-  if (content.bt.lastConnected !== address) {
+  let content = await cfgfile.read();
+  if (!content.hasOwnProperty('bt')) content.bt = {};
+  if (!content.bt.hasOwnProperty('lastConnected') || content.bt.lastConnected !== address) {
     content.bt.lastConnected = address;
     cfgfile.save(content);
     log.info(`device ${address} saved as last connected device`);
@@ -816,8 +815,8 @@ const saveLastDeviceConnected = async (address) => {
 }
 
 const setDefaultVolume = async (address) => {
-  let content = cfgfile.read();
-  if (content.bt.defaultVolume) {
+  let content = await cfgfile.read();
+  if (content.bt.hasOwnProperty('defaultVolume')) {
     for (let dev of content.bt.defaultVolume)
       if (dev.address === address) {
         await volumeSet(dev.volume);
