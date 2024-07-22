@@ -111,7 +111,7 @@ function rmOldEpisodes() {
     fs.readdirSync(podDir).map(fileName => {
       let fullFileName = path.join(cfg.get('player.podcastDownloads'), `podcasts/${fileName}`);
       let fileTs = fs.statSync(fullFileName).mtimeMs;
-      if ((now - fileTs) > (86400 * cfg.get('player.podcastRemovedAfterDays')))
+      if ((now - fileTs) > (86400 * 1000 * cfg.get('player.podcastRemovedAfterDays')))
         fs.unlink(fullFileName, (err) => {
           if (err) log.error(err);
           log.info(`${fullFileName} was deleted`);
