@@ -88,6 +88,8 @@ async function addFileToQueue(name, url) {
         // the download status
         // await pipeline(downloadStream, fileWriterStream);
         pipeline(downloadStream, fileWriterStream);
+      } else {
+        updateMpdQUeue(`podcasts/${name}.mp3`);
       }
       resolve('done');
     } catch (err) {
