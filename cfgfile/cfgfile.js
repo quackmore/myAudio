@@ -36,8 +36,10 @@ function save(content) {
   return new Promise(async (resolve, reject) => {
     try {
       fs.writeFileSync(path.join(cfgFilesRoot(), "config.json"), JSON.stringify(content, null, 4));
+      resolve('done');
     } catch (err) {
       log.error(err)
+      reject(err.message);
     }
   })
 }

@@ -53,7 +53,7 @@ const loadSpinner = () => {
     mdlCnt++;
     if (mdlCnt == 1) {
         document.getElementById("spinnerMod").style.visibility = "visible";
-        document.getElementById("spinnerMod").style.opacity = 0.3;
+        document.getElementById("spinnerMod").style.opacity = 1;
     }
 }
 const unloadSpinner = () => {
@@ -69,4 +69,10 @@ function secsToString(val) {
     let mm = Math.trunc((val % 3600) / 60);
     let ss = Math.trunc((val % 3600) % 60);
     return `${hh > 0 ? hh + ":" : ""}${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+}
+
+function msWait(ms) {
+    return new Promise((resolve, reject) => {
+        btTimer = setTimeout(resolve, ms);
+    });
 }

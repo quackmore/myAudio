@@ -275,23 +275,23 @@
     }
 
     async function outputSwitch() {
-      let req = "";
-      let url = ""
-      req = {
+      let url = document.getElementById('outSel').innerText === 'Speakers' ? `/speakers/toggle` : `/bt/cmd/power%20${player.bt.selectedCtrl.Powered === 'yes' ? 'off' : 'on'}`;
+      let req = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       };
-      if (document.getElementById('outSel').innerText === 'Speakers')
-        url = `/speakers/toggle`;
-      else
-        url = `/bt/power/${player.bt.Powered === 'yes' ? 'off' : 'on'}`;
       try {
+        loadSpinner();
         await toutFetch(url, 5000, req);
-        refreshPlayerStatus();
+        if (document.getElementById('outSel').innerText === 'Speakers')
+          refreshSpeakersStatus();
+        else
+          setTimeout(refreshBtStatus, 500);
       }
       catch (err) {
         alert(err.message);
       }
+      setTimeout(unloadSpinner, 500);
     }
 
     let firstTime = true;
@@ -313,14 +313,6 @@
           setOutput(output);
           firstTime = false;
         }
-        if (document.getElementById('outSel').innerText === 'Speakers') {
-          await getSpeakerStatus();
-          updateSpeakers();
-        } else {
-          await getBtStatus();
-          updateBT();
-        }
-        showBtDevicesPanel();
         await getMpdStatus();
         updateMpdPlayer();
         // DEBUG
@@ -355,6 +347,25 @@
         document.getElementById('volMute').innerHTML = player.speakers.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
         document.getElementById('volMute2').innerHTML = player.speakers.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
       };
+    }
+
+    let getSpeakersStatusFail = 0;
+
+    const refreshSpeakersStatus = async () => {
+      if (document.getElementById('outSel').innerText !== 'Speakers') return;
+      try {
+        {
+          await getSpeakerStatus();
+          updateSpeakers();
+        }
+        getSpeakersStatusFail = 0;
+      } catch (err) {
+        getSpeakersStatusFail++;
+        if (getSpeakersStatusFail > 2)
+          alert(err.message);
+        else
+          setTimeout(refreshSpeakersStatus, 500);
+      }
     }
 
     // MPD PLAYER
@@ -521,10 +532,12 @@
         .then(data => player.bt = data)
     }
 
-    const showBtDevicesPanel = () => {
-      if (document.getElementById('outSel').innerText === 'Speakers') closeBtDevMod();
-      else
-        if (player.bt.Powered === 'no') closeBtDevMod();
+    const mustShowBtDevices = () => {
+      return (document.getElementById('outSel').innerText === 'Bluetooth' &&
+        player.hasOwnProperty('bt') &&
+        player.bt.selectedCtrl != null &&
+        player.bt.selectedCtrl.Powered === 'yes' &&
+        player.bt.selectedCtrl.ConnectedDevice == null);
     }
 
     let getBtStatusFail = 0;
@@ -536,13 +549,13 @@
           await getBtStatus();
           updateBT();
         }
-        showBtDevicesPanel();
         getBtStatusFail = 0;
-      }
-      catch (err) {
+      } catch (err) {
         getBtStatusFail++;
         if (getBtStatusFail > 2)
           alert(err.message);
+        else
+          setTimeout(refreshBtStatus, 500);
       }
     }
 
@@ -563,61 +576,53 @@
 
     const connectDev = async (idx) => {
       loadSpinner();
-      toutFetch(`/bt/device/connect/${player.bt.devices[idx].address}`, 60000, {
-        method: 'POST'
-      })
-        .then(() => refreshBtStatus())
-        .catch((err) => alert(`Failed to connect to ${player.bt.devices[idx].name}: ${err.message}`))
-        .finally(() => unloadSpinner());
+      try {
+        if (player.bt.devices[idx].Paired == 'no') {
+          await toutFetch(`/bt/cmd/pair%20${escape(player.bt.devices[idx].Address)}`, 60000, { method: 'POST' });
+          await msWait(600);
+        }
+        if (player.bt.devices[idx].Trusted == 'no') {
+          await toutFetch(`/bt/cmd/trust%20${escape(player.bt.devices[idx].Address)}`, 60000, { method: 'POST' });
+          await msWait(600);
+        }
+        await toutFetch(`/bt/cmd/connect%20${escape(player.bt.devices[idx].Address)}`, 60000, { method: 'POST' });
+      } catch (err) {
+        alert(`Failed to connect to ${player.bt.devices[idx].Name}: ${err.message}`);
+      }
+      unloadSpinner();
     }
 
     const deleteDev = async (idx) => {
-      toutFetch(`/bt/device/remove/${player.bt.devices[idx].address}`, 60000, {
+      toutFetch(`/bt/cmd/remove%20${escape(player.bt.devices[idx].Address)}`, 60000, {
         method: 'POST'
       })
         .then(async () => {
           await player.bt.devices.splice(idx, 1);
-          refreshBtStatus();
         })
-        .catch((err) => alert(`Failed to remove ${player.bt.devices[idx].name}: ${err.message}`));
-    }
-
-    const devOnline = (idx) => {
-      if (player.bt.devices[idx].online)
-        return player.bt.devices[idx].online === "yes" ? "[online]" : "";
-      return "";
+        .catch((err) => alert(`Failed to remove ${player.bt.devices[idx].Name}: ${err.message}`));
     }
 
     const openBtDevMod = () => {
-      // quick refresh to get bluetooth updates
-      if (refreshBtInterval == null) periodicRefreshBt(1000);
       if (document.getElementById("btDevMod").style.display === "block") return;
       document.getElementById("btDevMod").style.display = "block";
     }
 
     const closeBtDevMod = () => {
       if (document.getElementById("btDevMod").style.display === "none") return;
-      // keep on quick refresh for 10 secs then slow down
-      setTimeout(periodicRefreshBt, 6000, 0);
       document.getElementById("btDevMod").style.display = "none";
     }
 
-    // TODO separare refresh bluetooth dal resto
+    const updateBTdesc = () => {
+      if (player.bt.selectedCtrl.ConnectedDevice) {
+        let connected = player.bt.selectedCtrl.ConnectedDevice;
+        document.getElementById('btDevDesc').innerHTML = `<span>${connected.Name}</span><i class="fa-regular fa-battery-three-quarters"></i><span>${connected.battery ? connected.battery : ""}</span>`;
+      } else
+        document.getElementById('btDevDesc').innerHTML = "";
+    }
 
-    const updateBT = () => {
-      if (!player.hasOwnProperty('bt')) return;
-      document.getElementById('outputSwitch').innerHTML = (player.bt.Powered === 'yes' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
-      let btDevList = document.getElementById('btDevList');
-      // console.log(player.bt);
-      if (!player.bt.hasOwnProperty('devices')) return;
-      btDevList.innerHTML = "";
-      for (let [idx, dev] of player.bt.devices.entries()) {
-        btDevList.innerHTML += `<div class="justify"><span class="pointer" onclick="connectDev(${idx})">${dev.name}</span><span>&emsp;&emsp;</span><span class="right">${devOnline(idx)}</span><span class="right"><i class="fa-regular fa-trash-can pointer" onclick="deleteDev(${idx})"></i></span>`;
-      }
-      if (player.bt.connected != null) {
-        closeBtDevMod();
-        let connected = player.bt.connected;
-        document.getElementById('btDevDesc').innerHTML = `<span>${connected.name}</span><i class="fa-regular fa-battery-three-quarters"></i><span>${connected.battery ? connected.battery : ""}</span>`;
+    const updateBTvolume = () => {
+      if (player.bt.selectedCtrl.ConnectedDevice) {
+        let connected = player.bt.selectedCtrl.ConnectedDevice;
         if (connected.volume) {
           document.getElementById('volRange').value = connected.volume.split("%")[0];
           document.getElementById('volLevel').innerText = connected.volume.split("%")[0];
@@ -627,10 +632,7 @@
           document.getElementById('volMute').innerHTML = connected.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
           document.getElementById('volMute2').innerHTML = connected.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
         }
-      }
-      else {
-        if (player.bt.Powered === 'yes') openBtDevMod();
-        document.getElementById('btDevDesc').innerHTML = "";
+      } else {
         document.getElementById('volRange').value = 0;
         document.getElementById('volRange').disabled = true;
         document.getElementById('volLevel').innerText = 0;
@@ -639,27 +641,82 @@
       }
     }
 
+    let prevCtrl = {
+      Powered: null,
+      ConnectedDevice: null,
+      counter: 0
+    };
+
+    const updateBT = () => {
+      if (!player.hasOwnProperty('bt')) return;
+      let ctrl = player.bt.selectedCtrl;
+      // update the switch status
+      document.getElementById('outputSwitch').innerHTML = (ctrl.Powered === 'yes' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
+
+      if (mustShowBtDevices()) {
+        if (!player.bt.hasOwnProperty('devices')) return;
+        // TODO: 
+        let tmpList = "";
+        for (let [idx, dev] of player.bt.devices.entries()) {
+          tmpList += `<div class="justify"><span class="pointer" onclick="connectDev(${idx})">${dev.Name}</span><span class="right"><i class="fa-regular fa-trash-can pointer" onclick="deleteDev(${idx})"></i></span></div>`;
+        }
+        let btDevList = document.getElementById('btDevList');
+        btDevList.innerHTML = tmpList;
+        openBtDevMod();
+      }
+      else
+        closeBtDevMod();
+
+      updateBTdesc();
+      updateBTvolume();
+
+      // set the timer for next BT update
+      if (ctrl.Powered != prevCtrl.Powered) {
+        periodicRefreshBt(1000);
+        prevCtrl.Powered = ctrl.Powered;
+        prevCtrl.counter = 0;
+      }
+      let ConnectedDevice = (ctrl.ConnectedDevice != null);
+      if (ConnectedDevice == prevCtrl.ConnectedDevice) {
+        prevCtrl.counter++;
+        if (ctrl.Powered == 'yes' && ConnectedDevice && prevCtrl.counter > 8)
+          periodicRefreshBt(10000);
+        if (ctrl.Powered == 'no' && !ConnectedDevice && prevCtrl.counter > 8)
+          periodicRefreshBt(0);
+      } else {
+        prevCtrl.ConnectedDevice = ConnectedDevice;
+        prevCtrl.counter = 0;
+        periodicRefreshBt(1000);
+      }
+    }
+
     // VOLUME
 
     const volumeSet = async () => {
       let vol = document.getElementById('volRange').value;
+      loadSpinner();
       if (document.getElementById('outSel').innerText === 'Speakers') {
-        if (`${vol}%` !== player.speakers.volume)
-          toutFetch(`/speakers/volume/set/${vol}%25`, 60000, {
-            method: 'POST'
-          })
-            .then(() => refreshPlayerStatus())
-            .catch((err) => alert(`Failed to set speakers volume to ${vol} - ${err.message}`));
+        try {
+          if (`${vol}%` !== player.speakers.volume) {
+            await toutFetch(`/speakers/volume/set/${vol}%25`, 60000, { method: 'POST' });
+            await refreshSpeakersStatus();
+          }
+        } catch (err) {
+          alert(`Failed to set speakers volume to ${vol} - ${err.message}`);
+        }
       } else {
-        if (player.bt.connected == null) return;
-        let connected = player.bt.connected;
-        if (`${vol}%` !== connected.volume)
-          toutFetch(`/bt/volume/set/${vol}%25`, 60000, {
-            method: 'POST'
-          })
-            .then(() => refreshPlayerStatus())
-            .catch((err) => alert(`Failed to set ${connected.name} volume to ${vol} - ${err.message}`));
+        if (player.bt.selectedCtrl.ConnectedDevice == null) return;
+        let connected = player.bt.selectedCtrl.ConnectedDevice;
+        try {
+          if (`${vol}%` !== connected.volume) {
+            await toutFetch(`/bt/volume/set/${vol}%25`, 60000, { method: 'POST' });
+            await refreshBtStatus();
+          }
+        } catch (err) {
+          alert(`Failed to set ${connected.Name} volume to ${vol} - ${err.message}`);
+        }
       }
+      unloadSpinner();
     }
 
     const showVolume = () => {
@@ -668,58 +725,70 @@
 
     const volumeInc = async () => {
       if (document.getElementById('volRange').disabled) return;
+      loadSpinner();
       if (document.getElementById('outSel').innerText === 'Speakers') {
-        toutFetch(`/speakers/volume/inc`, 60000, {
-          method: 'POST'
-        })
-          .then(() => refreshPlayerStatus())
-          .catch((err) => alert(`Failed to increase speakers volume - ${err.message}`));
+        try {
+          await toutFetch(`/speakers/volume/inc`, 60000, { method: 'POST' });
+          await refreshSpeakersStatus();
+        } catch (err) {
+          alert(`Failed to increase speakers volume - ${err.message}`);
+        }
       } else {
-        if (player.bt.connected == null) return;
-        toutFetch(`/bt/volume/inc`, 60000, {
-          method: 'POST'
-        })
-          .then(() => refreshPlayerStatus())
-          .catch((err) => alert(`Failed to increase ${player.bt.connected.name} volume - ${err.message}`));
+        if (player.bt.selectedCtrl.ConnectedDevice == null) return;
+        try {
+          await toutFetch(`/bt/volume/inc`, 60000, { method: 'POST' });
+          await refreshBtStatus();
+        } catch (err) {
+          alert(`Failed to increase ${player.bt.selectedCtrl.ConnectedDevice.Name} volume - ${err.message}`);
+        }
       }
+      unloadSpinner();
     }
 
     const volumeDec = async () => {
       if (document.getElementById('volRange').disabled) return;
+      loadSpinner();
       if (document.getElementById('outSel').innerText === 'Speakers') {
-        toutFetch(`/speakers/volume/dec`, 60000, {
-          method: 'POST'
-        })
-          .then(() => refreshPlayerStatus())
-          .catch((err) => alert(`Failed to decrease speakers volume - ${err.message}`));
+        try {
+          await toutFetch(`/speakers/volume/dec`, 60000, { method: 'POST' });
+          await refreshSpeakersStatus();
+        } catch (err) {
+          alert(`Failed to decrease speakers volume - ${err.message}`);
+        }
       } else {
-        if (player.bt.connected == null) return;
-        toutFetch(`/bt/volume/dec`, 60000, {
-          method: 'POST'
-        })
-          .then(() => refreshPlayerStatus())
-          .catch((err) => alert(`Failed to decrease ${player.bt.connected.name} volume - ${err.message}`));
+        if (player.bt.selectedCtrl.ConnectedDevice == null) return;
+        try {
+          await toutFetch(`/bt/volume/dec`, 60000, { method: 'POST' });
+          await refreshBtStatus();
+        } catch (err) {
+          alert(`Failed to decrease ${player.bt.selectedCtrl.ConnectedDevice.Name} volume - ${err.message}`);
+        }
       }
+      unloadSpinner();
     }
 
     const volumeToggleMute = async () => {
+      loadSpinner();
       if (document.getElementById('outSel').innerText === 'Speakers') {
         if (player.speakers.mute)
-          toutFetch(`/speakers/volume/set/${player.speakers.mute === "yes" ? "unmute" : "mute"}`, 60000, {
-            method: 'POST'
-          })
-            .then(() => refreshPlayerStatus())
-            .catch((err) => alert(`Failed to set speakers volume to [mute|unmute] - ${err.message}`));
+          try {
+            await toutFetch(`/speakers/volume/set/${player.speakers.mute === "yes" ? "unmute" : "mute"}`, 60000, { method: 'POST' });
+            await refreshSpeakersStatus();
+          } catch (err) {
+            alert(`Failed to set speakers volume to [mute|unmute] - ${err.message}`);
+          }
       } else {
-        if (player.bt.connected == null) return;
-        let dev = player.bt.connected;
+        if (player.bt.selectedCtrl.ConnectedDevice == null) return;
+        let dev = player.bt.selectedCtrl.ConnectedDevice;
         if (dev.mute)
-          toutFetch(`/bt/volume/mute/${dev.mute === "yes" ? "unmute" : "mute"}`, 60000, {
-            method: 'POST'
-          })
-            .then(() => refreshPlayerStatus())
-            .catch((err) => alert(`Failed to [mute|unmute] ${dev.name} volume ${err.message}`));
+          try {
+            toutFetch(`/bt/volume/mute/${dev.mute === "yes" ? "unmute" : "mute"}`, 60000, { method: 'POST' });
+            refreshBtStatus();
+          } catch (err) {
+            alert(`Failed to [mute|unmute] ${dev.Name} volume ${err.message}`);
+          }
       }
+      unloadSpinner();
     }
 
     const openVolumeMod = () => {

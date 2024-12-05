@@ -347,7 +347,8 @@ const events = {
   BT_POWERON: "BT_POWERON",
   BT_POWEROFF: "BT_POWEROFF",
   DEV_CONNECTED: "DEV_CONNECTED",
-  DEV_DISCONNECTED: "DEV_DISCONNECTED"
+  DEV_DISCONNECTED: "DEV_DISCONNECTED",
+  DEV_AVAILABLE: "DEV_AVAILABLE"
 };
 
 const isControllerListed = (addr) => bth.controllers.map(item => item.Address).includes(addr);
@@ -524,6 +525,8 @@ var bluetoothctl = null;
 const bluetoothctlInput = (cmd) => {
   log.info('bluetoothctl stdin: ' + cmd);
   if (bluetoothctl) bluetoothctl.stdin.write(cmd + '\n');
+  // manage exceptions
+  if (cmd.includes('power')) setTimeout(bluetoothctlInput, 2000, 'show');
 }
 
 const bluetoothctlStart = () => {
@@ -608,6 +611,7 @@ btEvent.on(events.BT_POWEROFF, () => {
 btEvent.on(events.DEV_CONNECTED, async address => {
   log.info(`device ${address} connected`);
   btNotAvailForConn();
+  await updateAlsaBtCfg(address);
   let cnt = 0;
   while (!bth.selectedCtrl.ConnectedDevice.hasOwnProperty('batCtrl') || !bth.selectedCtrl.ConnectedDevice.hasOwnProperty('volCtrl')) {
     await btWait(1000);
@@ -624,9 +628,14 @@ btEvent.on(events.DEV_CONNECTED, async address => {
     await getBluealsaVolume();
     await saveLastDeviceConnected(address);
     await setDefaultVolume(address);
+    btEvent.emit(events.DEV_AVAILABLE, address);
   } else {
     log.error("didn't find any bluealsa controls");
   }
+})
+
+btEvent.on(events.DEV_AVAILABLE, async address => {
+  log.info(`device ${address} provisioned and available`);
 })
 
 btEvent.on(events.DEV_DISCONNECTED, async address => {

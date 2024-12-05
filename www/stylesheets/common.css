@@ -241,11 +241,13 @@ body {
     pointer-events: none;
     width: 2.5em;
     height: 2.5em;
-    border: 0.5em solid transparent;
+    border: 0.2em solid transparent;
+    border-color: #020000;
+    border-top-color: rgb(255, 254, 253);
     /* border-color: #eee;
-    border-top-color: rgb(197, 125, 18); */
+    border-top-color: rgb(197, 125, 18);
     border-color: rgb(12, 12, 68);
-    border-top-color: lightblue;
+    border-top-color: lightblue; */
     border-radius: 50%;
     animation: loadingspin 1s linear infinite;
 }
