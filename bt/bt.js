@@ -1,8 +1,5 @@
 import log from '../logger/logger.js';
-import mpd from '../mpd/mpd.js';
-import cfg from 'config';
 import cfgfile from '../cfgfile/cfgfile.js';
-import fs from 'fs';
 import stripAnsi from 'strip-ansi';
 import EventEmitter from 'events';
 import { spawn } from "child_process";
@@ -303,29 +300,6 @@ const setDefaultVolume = async (address) => {
   log.info(`no default volume for device ${address}`);
 }
 
-const updateAlsaBtCfg = async (address) => {
-  let file_content = "";
-  try {
-    file_content = fs.readFileSync(cfg.get('player.alsaCfgFile')).toString();
-  } catch (err) {
-    log.error(err)
-    return;
-  }
-  if (file_content.includes(address)) {
-    log.info(`alsa cfg file ${cfg.get('player.alsaCfgFile')} is up to date`);
-    return;
-  }
-  let fixedContent = file_content.substring(0, file_content.indexOf('# BLUETOOTH CUSTOM DEVICE\n'));
-  file_content = fixedContent + `# BLUETOOTH CUSTOM DEVICE\n\npcm.bth-speaker {\n    type plug\n    slave.pcm {\n        type bluealsa\n        device "${address}"\n        profile "a2dp"\n    }\n}`;
-  try {
-    fs.writeFileSync(cfg.get('player.alsaCfgFile'), file_content);
-    await mpd.restart();
-    log.info(`device ${address} added to alsa cfg file ${cfg.get('player.alsaCfgFile')}`);
-  } catch (err) {
-    log.error(err)
-  }
-}
-
 const saveLastDeviceConnected = async (address) => {
   let content = await cfgfile.read();
   if (!content.hasOwnProperty('bt')) content.bt = {};
@@ -337,7 +311,6 @@ const saveLastDeviceConnected = async (address) => {
     log.info(`last connected device updated to ${address} `);
   }
 }
-
 
 const btEvent = new EventEmitter();
 
@@ -611,7 +584,6 @@ btEvent.on(events.BT_POWEROFF, () => {
 btEvent.on(events.DEV_CONNECTED, async address => {
   log.info(`device ${address} connected`);
   btNotAvailForConn();
-  await updateAlsaBtCfg(address);
   let cnt = 0;
   while (!bth.selectedCtrl.ConnectedDevice.hasOwnProperty('batCtrl') || !bth.selectedCtrl.ConnectedDevice.hasOwnProperty('volCtrl')) {
     await btWait(1000);

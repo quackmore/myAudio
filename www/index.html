@@ -259,6 +259,10 @@
       }
     }
 
+    function getOutput() {
+      return document.getElementById('outSel').innerText;
+    }
+
     async function toggleOutput(current) {
       let newOutput = 'Speakers';
       if (current === 'Speakers')
@@ -269,13 +273,16 @@
         cfg = await readCfg();
         cfg.output = newOutput;
         saveCfg(cfg);
-        refreshPlayerStatus();
+        if (newOutput === 'Speakers')
+          refreshSpeakersStatus();
+        else
+          refreshBtStatus();
       }
       catch (err) { alert(err.message) }
     }
 
     async function outputSwitch() {
-      let url = document.getElementById('outSel').innerText === 'Speakers' ? `/speakers/toggle` : `/bt/cmd/power%20${player.bt.selectedCtrl.Powered === 'yes' ? 'off' : 'on'}`;
+      let url = getOutput() === 'Speakers' ? `/speakers/toggle` : `/bt/cmd/power%20${player.bt.selectedCtrl.Powered === 'yes' ? 'off' : 'on'}`;
       let req = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
@@ -283,7 +290,7 @@
       try {
         loadSpinner();
         await toutFetch(url, 5000, req);
-        if (document.getElementById('outSel').innerText === 'Speakers')
+        if (getOutput() === 'Speakers')
           refreshSpeakersStatus();
         else
           setTimeout(refreshBtStatus, 500);
@@ -299,20 +306,6 @@
 
     const refreshPlayerStatus = async () => {
       try {
-        if (firstTime) {
-          await getSpeakerStatus();
-          updateSpeakers();
-          await getBtStatus();
-          updateBT();
-          await getMpdStatus();
-          let output = 'Speakers';
-          let cfg = {};
-          cfg = await readCfg();
-          if (cfg.output)
-            output = cfg.output;
-          setOutput(output);
-          firstTime = false;
-        }
         await getMpdStatus();
         updateMpdPlayer();
         // DEBUG
@@ -336,7 +329,7 @@
         .then(data => player.speakers = data)
     }
 
-    const updateSpeakers = () => {
+    const updateSpeakers = async () => {
       if (!player.speakers) return;
       document.getElementById('outputSwitch').innerHTML = (player.speakers.speakerOn === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
       document.getElementById('btDevDesc').innerHTML = "";
@@ -347,16 +340,17 @@
         document.getElementById('volMute').innerHTML = player.speakers.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
         document.getElementById('volMute2').innerHTML = player.speakers.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
       };
+      closeBtDevMod();
     }
 
     let getSpeakersStatusFail = 0;
 
     const refreshSpeakersStatus = async () => {
-      if (document.getElementById('outSel').innerText !== 'Speakers') return;
+      if (getOutput() !== 'Speakers') return;
       try {
         {
           await getSpeakerStatus();
-          updateSpeakers();
+          await updateSpeakers();
         }
         getSpeakersStatusFail = 0;
       } catch (err) {
@@ -695,7 +689,7 @@
     const volumeSet = async () => {
       let vol = document.getElementById('volRange').value;
       loadSpinner();
-      if (document.getElementById('outSel').innerText === 'Speakers') {
+      if (getOutput() === 'Speakers') {
         try {
           if (`${vol}%` !== player.speakers.volume) {
             await toutFetch(`/speakers/volume/set/${vol}%25`, 60000, { method: 'POST' });
@@ -726,7 +720,7 @@
     const volumeInc = async () => {
       if (document.getElementById('volRange').disabled) return;
       loadSpinner();
-      if (document.getElementById('outSel').innerText === 'Speakers') {
+      if (getOutput() === 'Speakers') {
         try {
           await toutFetch(`/speakers/volume/inc`, 60000, { method: 'POST' });
           await refreshSpeakersStatus();
@@ -748,7 +742,7 @@
     const volumeDec = async () => {
       if (document.getElementById('volRange').disabled) return;
       loadSpinner();
-      if (document.getElementById('outSel').innerText === 'Speakers') {
+      if (getOutput() === 'Speakers') {
         try {
           await toutFetch(`/speakers/volume/dec`, 60000, { method: 'POST' });
           await refreshSpeakersStatus();
@@ -769,7 +763,7 @@
 
     const volumeToggleMute = async () => {
       loadSpinner();
-      if (document.getElementById('outSel').innerText === 'Speakers') {
+      if (getOutput() === 'Speakers') {
         if (player.speakers.mute)
           try {
             await toutFetch(`/speakers/volume/set/${player.speakers.mute === "yes" ? "unmute" : "mute"}`, 60000, { method: 'POST' });
@@ -1555,9 +1549,23 @@
 
     // STARTUP
     async function startup() {
-      await refreshPlayerStatus();
+      loadSpinner();
+      let output = 'Speakers';
+      let cfg = {};
+      cfg = await readCfg();
+      if (cfg.output)
+        output = cfg.output;
+      setOutput(output);
+      await getSpeakerStatus();
+      if (getOutput() === 'Speakers') await updateSpeakers();
+      await getBtStatus();
+      if (getOutput() === 'Bluetooth') await updateBT();
+      await getMpdStatus();
+      await updateMpdPlayer();
+
       loadQueue();
       periodicRefreshStatus(30000);
+      unloadSpinner();
     }
 
     startup();
