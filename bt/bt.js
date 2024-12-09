@@ -579,6 +579,7 @@ btEvent.on(events.BT_POWERON, async () => {
 btEvent.on(events.BT_POWEROFF, () => {
   log.info("BT powered off...");
   btNotAvailForConn();
+  if (bth.selectedCtrl != null && bth.selectedCtrl.ConnectedDevice != null) bth.selectedCtrl.ConnectedDevice = null;
 })
 
 btEvent.on(events.DEV_CONNECTED, async address => {
