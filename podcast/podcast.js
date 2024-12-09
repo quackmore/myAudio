@@ -43,7 +43,7 @@ async function getEpisodes(feedUrl) {
     try {
       let parser = new RSSParser();
       let feed = await parser.parseURL(feedUrl);
-      resolve(feed.items.map(item => ({ title: item.title, url: item.enclosure.url, duration: item.itunes.duration, contentSnippet: item.contentSnippet, date: item.isoDate.substring(0, 10) })));
+      resolve(feed.items.map(item => ({ title: item.title, url: item.enclosure.url, duration: item.itunes.duration, contentSnippet: item.contentSnippet, date: item.isoDate.substring(0, 10) })).sort((a, b) => new Date(b.date) - new Date(a.date)));
     } catch (err) {
       log.error(err.message)
       reject(err.message);
