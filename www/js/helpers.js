@@ -65,9 +65,17 @@ const unloadSpinner = () => {
 }
 
 function secsToString(val) {
-    let hh = Math.trunc(val / 3600);
-    let mm = Math.trunc((val % 3600) / 60);
-    let ss = Math.trunc((val % 3600) % 60);
+    let hh = 0, mm = 0, ss = 0;
+    if (val.toString().includes(':')) {
+        let splitted = val.toString().split(':');
+        hh = splitted[0];
+        mm = splitted[1];
+        ss = splitted[2];
+    } else {
+        hh = Math.trunc(val / 3600);
+        mm = Math.trunc((val % 3600) / 60);
+        ss = Math.trunc((val % 3600) % 60);
+    }
     return `${hh > 0 ? hh + ":" : ""}${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }
 
