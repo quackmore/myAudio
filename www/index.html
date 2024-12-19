@@ -67,7 +67,9 @@
       <div class="justify" style="padding: 20px;">
         <i class="fa-solid fa-shuffle fa-xs actC" style="color: lightgray;" id="shuffle" onclick="toggleShuffle()"></i>
         <i class="fa-solid fa-backward-step fa-sm actC" id="previous" onclick="mpdCmd('previous',[])"></i>
+        <i class="fa-solid fa-backward fa-sm actC" id="backward" onclick="mpdCmd('seekcur',['-15'])"></i>
         <i class="fa-solid fa-play fa-xl actC" id="play" onclick="togglePlay()"></i>
+        <i class="fa-solid fa-forward fa-sm actC" id="forward" onclick="mpdCmd('seekcur',['+15'])"></i>
         <i class="fa-solid fa-forward-step fa-sm actC" id="next" onclick="mpdCmd('next',[])"></i>
         <span>
           <i class="fa-solid fa-repeat fa-xs actC" style="color: lightgray;" id="repeat" onclick="toggleRepeat()"></i>
