@@ -69,8 +69,10 @@
         <i class="fa-solid fa-backward-step fa-sm actC" id="previous" onclick="mpdCmd('previous',[])"></i>
         <i class="fa-solid fa-play fa-xl actC" id="play" onclick="togglePlay()"></i>
         <i class="fa-solid fa-forward-step fa-sm actC" id="next" onclick="mpdCmd('next',[])"></i>
-        <i class="fa-solid fa-repeat fa-xs actC" style="color: lightgray;" id="repeat" onclick="toggleRepeat()"></i>
-        <i class="fa-solid fa-1 fa-xs actC" style="color: lightgray;" id="single" onclick="toggleSingle()"></i>
+        <span>
+          <i class="fa-solid fa-repeat fa-xs actC" style="color: lightgray;" id="repeat" onclick="toggleRepeat()"></i>
+          <i class="fa-solid fa-1 fa-xs actC" style="color: lightgray;" id="single" onclick="toggleRepeat()"></i>
+        </span>
       </div>
     </div>
   </div>
@@ -284,8 +286,6 @@
       try {
         await getMpdStatus();
         updateMpdPlayer();
-        // DEBUG
-        // console.log(player);
         getPlayerStatusFail = 0;
       }
       catch (err) {
@@ -417,18 +417,16 @@
 
     const toggleRepeat = () => {
       if (!player.mpd) return;
-      if (player.mpd.status.repeat === '1')
-        mpdCmd('repeat', ['0']);
-      else
+      if (player.mpd.status.repeat === '0') {
         mpdCmd('repeat', ['1']);
-    }
-
-    const toggleSingle = () => {
-      if (!player.mpd) return;
-      if (player.mpd.status.single === '1')
-        mpdCmd('single', ['0']);
-      else
-        mpdCmd('single', ['1']);
+      } else {
+        if (player.mpd.status.single === '0')
+          mpdCmd('single', ['1']);
+        else {
+          mpdCmd('repeat', ['0']);
+          mpdCmd('single', ['0']);
+        }
+      }
     }
 
     function playerDefault() {
@@ -439,11 +437,14 @@
     }
 
     const updateMpdPlayer = () => {
-      if (!player.hasOwnProperty('mpd') || !player.mpd.hasOwnProperty('curSong') || !player.mpd.curSong.hasOwnProperty('file')) {
+      // if (!player.hasOwnProperty('mpd') || !player.mpd.hasOwnProperty('curSong') || !player.mpd.curSong.hasOwnProperty('file')) {
+      if (!player.hasOwnProperty('mpd')) {
         playerDefault();
         return;
       }
-      if (player.mpd.hasOwnProperty('curSong')) {
+      // DEBUG
+      // console.log(player);
+      if (player.mpd.hasOwnProperty('curSong') && player.mpd.curSong.hasOwnProperty('file')) {
         let curSong = player.mpd.curSong;
         let desc = "";
         if (curSong.file.startsWith('http')) {
@@ -466,7 +467,7 @@
         }
         document.getElementById('song').innerHTML = desc;
       }
-      if (player.mpd.status) {
+      if (player.mpd.hasOwnProperty('status')) {
         if (player.mpd.status.error) alert(player.mpd.status.error);
         //document.getElementById('elapsed').value = 100 * parseFloat(player.mpd.status.elapsed) / parseFloat(player.mpd.status.duration);
         if (player.mpd.status.random === '1')
