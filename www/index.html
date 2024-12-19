@@ -24,80 +24,53 @@
           <span class="outSelect actBC" id="outSel" onclick="toggleOutput(this.innerText)"></span>
           <i id="outSelI"></i>
           <div class="actC" id="outputSwitch" onclick="outputSwitch()"></div>
-          <div class="left" id="btDevDesc" style="font-size: small"></div>
         </div>
-      </div>
-      <div id="btDevMod" style="display: none;">
-        <div id="btDevList" style="padding: 20px; background-color: lightblue;">
-          <!--
-          <div class="justify">
-            <span>Device 1</span>
-            <div class="right">
-              <i class="fa-regular fa-trash-can"></i>
-            </div>
-          </div>
-          <div class="justify">
-            <span>Device lunghissima</span>
-            <span>&emsp;&emsp;</span>
-            <div class="right">
-              <i class="fa-regular fa-trash-can"></i>
-            </div>
-          </div> 
-          -->
-        </div>
-      </div>
-      <div class="center" style="padding: 10px;">
-        <span id="song" style="font-size: small;">-</span>
-      </div>
-      <div class="center" style="gap: 10px;">
-        <div class="left" style="width: 60%;">
-          <input type="range" min="1" max="100" value="0" class="slider" id="elapsed" onchange="setPosition(this.value)"
-            onpointerdown="setUpdateElapsed(0);" onpointerup="setUpdateElapsed(1000);">
-        </div>
-        <span class="right" style="font-size: small;" id="duration"> </span>
-      </div>
-      <div class="justify" style="padding-top: 10px;">
-        <div class="justify" style="padding-left: 40px; padding-right: 40px;">
-          <i class="fa-solid fa-shuffle fa-xs actC" style="color: lightgray;" id="shuffle"
-            onclick="toggleShuffle()"></i>
-          <i class="fa-solid fa-backward-step fa-sm actC" id="previous" onclick="mpdCmd('previous',[])"></i>
-          <i class="fa-solid fa-play fa-xl actC" id="play" onclick="togglePlay()"></i>
-          <i class="fa-solid fa-forward-step fa-sm actC" id="next" onclick="mpdCmd('next',[])"></i>
-          <i class="fa-solid fa-repeat fa-xs actC" style="color: lightgray;" id="repeat" onclick="toggleRepeat()"></i>
-          <i class="fa-solid fa-1 fa-xs actC" style="color: lightgray;" id="single" onclick="toggleSingle()"></i>
-        </div>
-        <div class="right" style="padding-right: 20px;">
+        <div class="right">
           <div class="left">
-            <span id="volMute2" onclick="volumeToggleMute()">
+            <span id="volMute" onclick="volumeToggleMute()">
               <i class="fa-solid fa-volume-xmark actC"></i>
             </span>
           </div>
+          <div></div>
           <div class="right actC">
             <span id="volLevel" onclick="openVolumeMod()">0</span>
           </div>
         </div>
       </div>
       <div id="volumeMod" style="display: none; margin-top: 10px;">
-        <div class="justify">
-          <div class="justify" style="padding: 20px; background-color: lightblue;">
-            <div class=" left">
-              <span id="volMute" onclick="volumeToggleMute()">
-                <i class="fa-solid fa-volume-xmark actBC"></i>
-              </span>
-              <i id="volMinus" class="fa-solid fa-minus actBC" onclick="volumeDec()"></i>
-            </div>
-            <div class="volSlider">
-              <input type="range" min="1" max="100" value="0" class="slider" id="volRange" disabled
-                onchange="volumeSet()" oninput="showVolume()">
-            </div>
-            <div class="right">
-              <i id="volPlus" class="fa-solid fa-plus actBC" onclick="volumeInc()"></i>
-            </div>
-            <div class="right">
-              <i onclick="closeVolumeMod()" class="fa-regular fa-xmark actBC"></i>
-            </div>
+        <div class="justify" style="padding: 20px; gap: 30px; background-color: lightblue;">
+          <div class="left">
+            <i id="volMinus" class="fa-solid fa-minus actBC" onclick="volumeDec()"></i>
+          </div>
+          <div class="volSlider">
+            <input type="range" min="1" max="100" value="0" class="slider" id="volRange" disabled onchange="volumeSet()"
+              oninput="showVolume()">
+          </div>
+          <div class="right">
+            <i id="volPlus" class="fa-solid fa-plus actBC" onclick="volumeInc()"></i>
           </div>
         </div>
+      </div>
+      <div id="btDevMod" style="display: none; margin-top: 10px;">
+        <div id="btDevList" style="padding: 20px; background-color: lightblue;"></div>
+      </div>
+      <div class="center" style="padding: 10px;">
+        <span id="song" style="font-size: small;">-</span>
+      </div>
+      <div class="center">
+        <div style="width: 60%;">
+          <input type="range" min="1" max="100" value="0" class="slider" id="elapsed" onchange="setPosition(this.value)"
+            onpointerdown="setUpdateElapsed(0);" onpointerup="setUpdateElapsed(1000);">
+        </div>
+        <span class="right" style="font-size: small;" id="duration"> </span>
+      </div>
+      <div class="justify" style="padding: 20px;">
+        <i class="fa-solid fa-shuffle fa-xs actC" style="color: lightgray;" id="shuffle" onclick="toggleShuffle()"></i>
+        <i class="fa-solid fa-backward-step fa-sm actC" id="previous" onclick="mpdCmd('previous',[])"></i>
+        <i class="fa-solid fa-play fa-xl actC" id="play" onclick="togglePlay()"></i>
+        <i class="fa-solid fa-forward-step fa-sm actC" id="next" onclick="mpdCmd('next',[])"></i>
+        <i class="fa-solid fa-repeat fa-xs actC" style="color: lightgray;" id="repeat" onclick="toggleRepeat()"></i>
+        <i class="fa-solid fa-1 fa-xs actC" style="color: lightgray;" id="single" onclick="toggleSingle()"></i>
       </div>
     </div>
   </div>
@@ -194,8 +167,8 @@
       <button class="cmdBtn" onclick="podSelCancel()">cancel</button>
       <button class="cmdBtn" onclick="podShowContent()" id="podSCBtn">show content</button>
     </div>
-    <div class="noGrowNoShrink justify" style="height: 50px;">
-      <div class="justify" id="queueFn">
+    <div class="noGrowNoShrink right" style="width: 100%; height: 50px;">
+      <div class="right" id="queueFn">
         <div class="left" style="font-size: medium;">
           <span id="queueDuration"></span>
         </div>
@@ -205,14 +178,14 @@
           <button onclick="clearQueue()">clear</button>
         </div>
       </div>
-      <div class="justify" id="playlistsFn" style="display: none;">
+      <div class="right" id="playlistsFn" style="display: none;">
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
           <button onclick="listPlaylists()" id="cancel2" disabled>cancel</button>
         </div>
       </div>
-      <div class="justify" id="filesFn" style="display: none;">
+      <div class="right" id="filesFn" style="display: none;">
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
@@ -220,7 +193,7 @@
           <button onclick="goBack()" id="goBack" disabled>back</button>
         </div>
       </div>
-      <div class="justify" id="streamsFn" style="display: none;">
+      <div class="right" id="streamsFn" style="display: none;">
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
@@ -228,7 +201,7 @@
           <button onclick="newStream()">new stream</button>
         </div>
       </div>
-      <div class="justify" id="podcastFn" style="display: none;">
+      <div class="right" id="podcastFn" style="display: none;">
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
@@ -249,12 +222,15 @@
 
     var player = {};
 
+    const btDevDefault = 'Bluetooth';
+    var btDevName = btDevDefault;
+
     function setOutput(output) {
       if (output === 'Speakers') {
         document.getElementById('outSel').innerText = 'Speakers';
         document.getElementById('outSelI').className = 'fa-regular fa-volume-high';
       } else {
-        document.getElementById('outSel').innerText = 'Bluetooth';
+        document.getElementById('outSel').innerHTML = btDevName;
         document.getElementById('outSelI').className = 'fa-regular fa-headphones';
       }
     }
@@ -332,13 +308,11 @@
     const updateSpeakers = async () => {
       if (!player.speakers) return;
       document.getElementById('outputSwitch').innerHTML = (player.speakers.speakerOn === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
-      document.getElementById('btDevDesc').innerHTML = "";
       document.getElementById('volRange').value = player.speakers.volume.split("%")[0];
       document.getElementById('volRange').disabled = false;
       document.getElementById('volLevel').innerText = player.speakers.volume.split("%")[0];
       if (player.speakers.mute) {
         document.getElementById('volMute').innerHTML = player.speakers.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
-        document.getElementById('volMute2').innerHTML = player.speakers.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
       };
       closeBtDevMod();
     }
@@ -527,7 +501,7 @@
     }
 
     const mustShowBtDevices = () => {
-      return (document.getElementById('outSel').innerText === 'Bluetooth' &&
+      return (document.getElementById('outSel').innerText !== 'Speakers' &&
         player.hasOwnProperty('bt') &&
         player.bt.selectedCtrl != null &&
         player.bt.selectedCtrl.Powered === 'yes' &&
@@ -537,7 +511,7 @@
     let getBtStatusFail = 0;
 
     const refreshBtStatus = async () => {
-      if (document.getElementById('outSel').innerText !== 'Bluetooth') return;
+      if (document.getElementById('outSel').innerText === 'Speakers') return;
       try {
         {
           await getBtStatus();
@@ -583,6 +557,7 @@
       } catch (err) {
         alert(`Failed to connect to ${player.bt.devices[idx].Name}: ${err.message}`);
       }
+      await msWait(1000);
       unloadSpinner();
     }
 
@@ -609,9 +584,26 @@
     const updateBTdesc = () => {
       if (player.bt.selectedCtrl.ConnectedDevice) {
         let connected = player.bt.selectedCtrl.ConnectedDevice;
-        document.getElementById('btDevDesc').innerHTML = `<span>${connected.Name}</span><i class="fa-regular fa-battery-three-quarters"></i><span>${connected.battery ? connected.battery : ""}</span>`;
+        let batLev = 100;
+        let batLevStr = '100%';
+        let batIco = 'quarter';
+        if (connected.hasOwnProperty('battery'))
+          batLev = Number(connected.battery.split('%')[0]);
+        if (batLev >= 100)
+          batLevStr = '100%';
+        else
+          batLevStr = connected.battery;
+        if (batLev > 80)
+          batIco = 'full';
+        else if (batLev > 30)
+          batIco = 'half';
+        btDevName = `<span style="font-size: medium">${connected.Name}<br><i class="fa-regular fa-battery-${batIco}"></i>&nbsp&nbsp${batLevStr}</span>`;
       } else
-        document.getElementById('btDevDesc').innerHTML = "";
+        btDevName = btDevDefault;
+      if (getOutput() !== 'Speakers') {
+        document.getElementById('outSel').innerHTML = btDevName;
+        document.getElementById('outSelI').className = 'fa-regular fa-headphones';
+      }
     }
 
     const updateBTvolume = () => {
@@ -624,14 +616,12 @@
         }
         if (connected.mute) {
           document.getElementById('volMute').innerHTML = connected.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
-          document.getElementById('volMute2').innerHTML = connected.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
         }
       } else {
         document.getElementById('volRange').value = 0;
         document.getElementById('volRange').disabled = true;
         document.getElementById('volLevel').innerText = 0;
         document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark actC"></i>';
-        document.getElementById('volMute2').innerHTML = '<i class="fa-solid fa-volume-xmark actC"></i>';
       }
     }
 
@@ -1557,9 +1547,11 @@
         output = cfg.output;
       setOutput(output);
       await getSpeakerStatus();
-      if (getOutput() === 'Speakers') await updateSpeakers();
       await getBtStatus();
-      if (getOutput() === 'Bluetooth') await updateBT();
+      if (getOutput() === 'Speakers')
+        await updateSpeakers();
+      else
+        await updateBT();
       await getMpdStatus();
       await updateMpdPlayer();
 

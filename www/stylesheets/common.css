@@ -82,7 +82,6 @@ body {
 .justify {
     display: flex;
     justify-content: space-between;
-    width: 100%;
     align-items: center;
     margin: auto;
 }
@@ -99,7 +98,6 @@ body {
     font-family: inherit;
     font-style: inherit;
     font-size: inherit;
-    font-weight: bold;
     background-color: inherit;
     cursor: pointer;
 }
