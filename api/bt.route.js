@@ -27,14 +27,14 @@ router.post('/volume/set/:vol', async function (req, res, next) {
     .catch(err => res.status(500).send(err.message));
 });
 
-router.post('/volume/inc', async function (req, res, next) {
-  bt.volumeInc()
+router.post('/volume/inc/:balance', async function (req, res, next) {
+  bt.volumeInc(req.params.balance)
     .then(data => res.send(data))
     .catch(err => res.status(500).send(err.message));
 });
 
-router.post('/volume/dec', async function (req, res, next) {
-  bt.volumeDec()
+router.post('/volume/dec/:balance', async function (req, res, next) {
+  bt.volumeDec(req.params.balance)
     .then(data => res.send(data))
     .catch(err => res.status(500).send(err.message));
 });

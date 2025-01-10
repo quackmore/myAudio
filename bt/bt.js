@@ -110,12 +110,16 @@ const getBluealsaVolume = async () => {
       data += chunk;
     let volLevel = "";
     for (let line of data.toString().split('\n')) {
-      if (line.toString().length < 2) continue;
-      volLevel = line.toString();
+      let str= line.toString();
+      if (str.length < 5) continue;
+      if (str.includes('Front Left:')) {
+        BTdevice.volumeLeft = str.match(/\[(.*?)\]/)[1];
+        BTdevice.mute = str.match(/\[on\]/) ? "no" : "yes";
+      }
+      if (str.includes('Front Right:')) BTdevice.volumeRight = str.match(/\[(.*?)\]/)[1];
     }
-    if (volLevel.length > 5) {
-      BTdevice.volume = volLevel.match(/\[(.*?)\]/)[1];
-      BTdevice.mute = volLevel.match(/\[on\]/) ? "no" : "yes";
+    if (BTdevice.hasOwnProperty('volumeRight') && BTdevice.hasOwnProperty('volumeLeft')) {
+      BTdevice.volume = ((Number(BTdevice.volumeLeft.slice(0,-1)) + Number(BTdevice.volumeRight.slice(0,-1))) / 2).toFixed(0).toString() + '%';
       log.info(`${BTdevice.Name} volume level ${BTdevice.volume}`);
       log.info(`${BTdevice.Name} ${BTdevice.mute == 'yes' ? 'is' : 'is not'} muted`);
     }
@@ -178,14 +182,16 @@ const saveBTVolume = async () => {
   cfgfile.save(content);
 }
 
-const volumeInc = async () => {
+const volumeInc = async (balance) => {
   let BTdevice = bth.selectedCtrl.ConnectedDevice;
   if (BTdevice == null) return;
   if (BTdevice.volCtrl) {
     // set playback volume
     if (BTdevice.volume != "100%") {
       let volCtrlStr = `"${BTdevice.volCtrl}"`;
-      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, "1%+"]);
+      let balance_option = '';
+      if (balance == 'frontleft' || balance == 'frontright') balance_option = `${balance} `;
+      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, `${balance_option}1%+`]);
       let data = "";
       for await (const chunk of bthCmd.stdout)
         data += chunk;
@@ -208,14 +214,16 @@ const volumeInc = async () => {
   }
 }
 
-const volumeDec = async () => {
+const volumeDec = async (balance) => {
   let BTdevice = bth.selectedCtrl.ConnectedDevice;
   if (BTdevice == null) return;
   if (BTdevice.volCtrl) {
     // set playback volume
     if (BTdevice.volume != "0%") {
       let volCtrlStr = `"${BTdevice.volCtrl}"`;
-      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, "1%-"]);
+      let balance_option = '';
+      if (balance == 'frontleft' || balance == 'frontright') balance_option = `${balance} `;
+      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, `${balance_option}1%-`]);
       let data = "";
       for await (const chunk of bthCmd.stdout)
         data += chunk;

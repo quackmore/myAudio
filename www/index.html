@@ -50,6 +50,23 @@
             <i id="volPlus" class="fa-solid fa-plus actBC" onclick="volumeInc()"></i>
           </div>
         </div>
+        <div class="justify" style="padding: 20px; background-color: lightblue;">
+          <div class="left">
+            <i id="volMinus" class="fa-solid fa-minus actBC" onclick="volumeDec('frontleft')"></i>
+          </div>
+          <span id="volLeft" class="left">0</span>
+          <div class="left">
+            <i id="volPlus" class="fa-solid fa-plus actBC" onclick="volumeInc('frontleft')"></i>
+          </div>
+          <div>&nbsp;</div>
+          <div class="right">
+            <i id="volMinus" class="fa-solid fa-minus actBC" onclick="volumeDec('frontright')"></i>
+          </div>
+          <span id="volRight" class="right">0</span>
+          <div class="right">
+            <i id="volPlus" class="fa-solid fa-plus actBC" onclick="volumeInc('frontright')"></i>
+          </div>
+        </div>
       </div>
       <div id="btDevMod" style="display: none; margin-top: 10px;">
         <div id="btDevList" style="padding: 20px; background-color: lightblue;"></div>
@@ -615,6 +632,8 @@
         if (connected.volume) {
           document.getElementById('volRange').value = connected.volume.split("%")[0];
           document.getElementById('volLevel').innerText = connected.volume.split("%")[0];
+          document.getElementById('volLeft').innerText = connected.volumeLeft.split("%")[0];
+          document.getElementById('volRight').innerText = connected.volumeRight.split("%")[0];
           document.getElementById('volRange').disabled = false;
         }
         if (connected.mute) {
@@ -624,6 +643,8 @@
         document.getElementById('volRange').value = 0;
         document.getElementById('volRange').disabled = true;
         document.getElementById('volLevel').innerText = 0;
+        document.getElementById('volLeft').innerText = 0;
+        document.getElementById('volRight').innerText = 0;
         document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark actC"></i>';
       }
     }
@@ -710,9 +731,11 @@
       document.getElementById('volLevel').innerText = document.getElementById('volRange').value;
     }
 
-    const volumeInc = async () => {
+    const volumeInc = async (balance) => {
       if (document.getElementById('volRange').disabled) return;
       loadSpinner();
+      let balance_option = 'none';
+      if(balance == 'frontleft' || balance == 'frontright') balance_option = balance;
       if (getOutput() === 'Speakers') {
         try {
           await toutFetch(`/speakers/volume/inc`, 60000, { method: 'POST' });
@@ -723,7 +746,7 @@
       } else {
         if (player.bt.selectedCtrl.ConnectedDevice == null) return;
         try {
-          await toutFetch(`/bt/volume/inc`, 60000, { method: 'POST' });
+          await toutFetch(`/bt/volume/inc/${balance_option}`, 60000, { method: 'POST' });
           await refreshBtStatus();
         } catch (err) {
           alert(`Failed to increase ${player.bt.selectedCtrl.ConnectedDevice.Name} volume - ${err.message}`);
@@ -732,9 +755,11 @@
       unloadSpinner();
     }
 
-    const volumeDec = async () => {
+    const volumeDec = async (balance) => {
       if (document.getElementById('volRange').disabled) return;
       loadSpinner();
+      let balance_option = 'none';
+      if(balance == 'frontleft' || balance == 'frontright') balance_option = balance;
       if (getOutput() === 'Speakers') {
         try {
           await toutFetch(`/speakers/volume/dec`, 60000, { method: 'POST' });
@@ -745,7 +770,7 @@
       } else {
         if (player.bt.selectedCtrl.ConnectedDevice == null) return;
         try {
-          await toutFetch(`/bt/volume/dec`, 60000, { method: 'POST' });
+          await toutFetch(`/bt/volume/dec/${balance_option}`, 60000, { method: 'POST' });
           await refreshBtStatus();
         } catch (err) {
           alert(`Failed to decrease ${player.bt.selectedCtrl.ConnectedDevice.Name} volume - ${err.message}`);
