@@ -2,7 +2,7 @@
 import log from './logger/logger.js';
 import httpd from './httpd/httpd.js';
 import config from 'config';
-import packageJSON from "./package.json" assert { type: "json" };
+import packageJSON from "./package.json" with { type: "json" };
 import cfgFile from "./cfgfile/cfgfile.js";
 import mpd from "./mpd/mpd.js";
 import bt from "./bt/bt.js";

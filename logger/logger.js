@@ -1,6 +1,6 @@
 import winston from 'winston';
 import config from 'config'; 
-import packageJSON from "../package.json" assert {type: 'json'};
+import packageJSON from "../package.json" with {type: 'json'};
 
 const console_log = config.get('logger.console_log');
 
