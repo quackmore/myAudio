@@ -1,4 +1,4 @@
-import pkg from '../package.json' assert {type: 'json'};
+import pkg from '../package.json' with {type: 'json'};
 import cfg from 'config';
 import os from 'node:os';
 
