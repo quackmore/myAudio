@@ -7,31 +7,31 @@ import cfg from 'config';
 import bt from '../bt/bt.js';
 import fs from 'fs';
 
-const updateAlsaBtCfg = async (address) => {
-  let file_content = "";
-  try {
-    file_content = fs.readFileSync(cfg.get('player.alsaCfgFile')).toString();
-  } catch (err) {
-    log.error(err)
-    return;
-  }
-  if (file_content.includes(address)) {
-    log.info(`alsa cfg file ${cfg.get('player.alsaCfgFile')} is up to date`);
-    return;
-  }
-  let fixedContent = file_content.substring(0, file_content.indexOf('# BLUETOOTH CUSTOM DEVICE\n'));
-  file_content = fixedContent + `# BLUETOOTH CUSTOM DEVICE\n\npcm.bth-speaker {\n    type plug\n    slave.pcm {\n        type bluealsa\n        device "${address}"\n        profile "a2dp"\n    }\n}`;
-  try {
-    fs.writeFileSync(cfg.get('player.alsaCfgFile'), file_content);
-    await restart();
-    log.info(`device ${address} added to alsa cfg file ${cfg.get('player.alsaCfgFile')}`);
-  } catch (err) {
-    log.error(err)
-  }
-}
+// const updateAlsaBtCfg = async (address) => {
+//   let file_content = "";
+//   try {
+//     file_content = fs.readFileSync(cfg.get('player.alsaCfgFile')).toString();
+//   } catch (err) {
+//     log.error(err)
+//     return;
+//   }
+//   if (file_content.includes(address)) {
+//     log.info(`alsa cfg file ${cfg.get('player.alsaCfgFile')} is up to date`);
+//     return;
+//   }
+//   let fixedContent = file_content.substring(0, file_content.indexOf('# BLUETOOTH CUSTOM DEVICE\n'));
+//   file_content = fixedContent + `# BLUETOOTH CUSTOM DEVICE\n\npcm.bth-speaker {\n    type plug\n    slave.pcm {\n        type bluealsa\n        device "${address}"\n        profile "a2dp"\n    }\n}`;
+//   try {
+//     fs.writeFileSync(cfg.get('player.alsaCfgFile'), file_content);
+//     await restart();
+//     log.info(`device ${address} added to alsa cfg file ${cfg.get('player.alsaCfgFile')}`);
+//   } catch (err) {
+//     log.error(err)
+//   }
+// }
 
 bt.event.on(bt.events.DEV_CONNECTED, async address => {
-  await updateAlsaBtCfg(address);
+  // await updateAlsaBtCfg(address);
   if (cfg.has('player.bt_output')) {
     log.info(`enabling mpd output ${cfg.get('player.bt_output')}`);
     await output(['enableoutput', cfg.get('player.bt_output')]);
