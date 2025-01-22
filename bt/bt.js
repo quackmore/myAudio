@@ -40,7 +40,8 @@ const getBluealsaControls = async () => {
     if (line.toString().includes("A2DP")) {
       BTdevice.volCtrl = line.toString().split("'")[1];
       log.info(`found A2DP control ${BTdevice.volCtrl}`);
-    } if (line.toString().includes("Battery")) {
+    }
+    if (line.toString().includes("Battery")) {
       BTdevice.batCtrl = line.toString().split("'")[1];
       log.info(`found battery control ${BTdevice.batCtrl}`);
     }
@@ -110,7 +111,7 @@ const getBluealsaVolume = async () => {
       data += chunk;
     let volLevel = "";
     for (let line of data.toString().split('\n')) {
-      let str= line.toString();
+      let str = line.toString();
       if (str.length < 5) continue;
       if (str.includes('Front Left:')) {
         BTdevice.volumeLeft = str.match(/\[(.*?)\]/)[1];
@@ -119,7 +120,7 @@ const getBluealsaVolume = async () => {
       if (str.includes('Front Right:')) BTdevice.volumeRight = str.match(/\[(.*?)\]/)[1];
     }
     if (BTdevice.hasOwnProperty('volumeRight') && BTdevice.hasOwnProperty('volumeLeft')) {
-      BTdevice.volume = ((Number(BTdevice.volumeLeft.slice(0,-1)) + Number(BTdevice.volumeRight.slice(0,-1))) / 2).toFixed(0).toString() + '%';
+      BTdevice.volume = ((Number(BTdevice.volumeLeft.slice(0, -1)) + Number(BTdevice.volumeRight.slice(0, -1))) / 2).toFixed(0).toString() + '%';
       log.info(`${BTdevice.Name} volume level ${BTdevice.volume}`);
       log.info(`${BTdevice.Name} ${BTdevice.mute == 'yes' ? 'is' : 'is not'} muted`);
     }
@@ -594,7 +595,8 @@ btEvent.on(events.DEV_CONNECTED, async address => {
   log.info(`device ${address} connected`);
   btNotAvailForConn();
   let cnt = 0;
-  while (!bth.selectedCtrl.ConnectedDevice.hasOwnProperty('batCtrl') || !bth.selectedCtrl.ConnectedDevice.hasOwnProperty('volCtrl')) {
+  // while (!bth.selectedCtrl.ConnectedDevice.hasOwnProperty('batCtrl') || !bth.selectedCtrl.ConnectedDevice.hasOwnProperty('volCtrl')) {
+  while (!bth.selectedCtrl.ConnectedDevice.hasOwnProperty('volCtrl')) {
     await btWait(1000);
     log.info('inspecting bluealsa controls...');
     await getBluealsaControls(address);
@@ -602,10 +604,12 @@ btEvent.on(events.DEV_CONNECTED, async address => {
     if (cnt > 30) break;
   }
   if (cnt < 30) {
-    await getBluealsaBattery();
-    // periodically update battery level
-    if (btUpdateBatteryTimer) clearTimeout(btUpdateBatteryTimer);
-    btUpdateBatteryTimer = setTimeout(updateBattery, 60000);
+    if (bth.selectedCtrl.ConnectedDevice.hasOwnProperty('batCtrl')) {
+      await getBluealsaBattery();
+      // periodically update battery level
+      if (btUpdateBatteryTimer) clearTimeout(btUpdateBatteryTimer);
+      btUpdateBatteryTimer = setTimeout(updateBattery, 60000);
+    }
     await getBluealsaVolume();
     await saveLastDeviceConnected(address);
     await setDefaultVolume(address);
