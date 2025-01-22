@@ -179,7 +179,7 @@ const saveBTVolume = async () => {
       dev.volume = BTdevice.volume;
     }
   if (!devFound)
-    content.bt.defaultVolume.push({ 'address': BTdevice.Address, 'volume': value });
+    content.bt.defaultVolume.push({ 'address': BTdevice.Address, 'volume': BTdevice.volume });
   cfgfile.save(content);
 }
 
