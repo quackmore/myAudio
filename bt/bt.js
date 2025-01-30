@@ -139,28 +139,41 @@ const getBluealsaVolume = async () => {
   }
 }
 
-const setBluealsaVolume = async (value) => {
+const amixerSset = async (ctrl, val) => {
+  let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", ctrl, val]);
+  let data = "";
+  for await (const chunk of bthCmd.stdout)
+    data += chunk;
+  let error = "";
+  for await (const chunk of bthCmd.stderr) {
+    error += chunk;
+  }
+  let exitCode = await new Promise((resolve, reject) => {
+    bthCmd.on('close', resolve);
+  });
+
+  if (exitCode) {
+    let msg = `<amixer -D bluealsa sset ${ctrl} ${val}> got ${data} - ${error}`;
+    log.error(msg);
+  } else {
+    log.info(`bluealsa volume set to ${val}`);
+  }
+}
+
+const setBluealsaVolume = async (fl, fr) => {
   let BTdevice = bth.selectedCtrl.ConnectedDevice;
   if (BTdevice == null) return;
   if (BTdevice.volCtrl) {
     let volCtrlStr = `"${BTdevice.volCtrl}"`;
-    let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, value]);
-    let data = "";
-    for await (const chunk of bthCmd.stdout)
-      data += chunk;
-    let error = "";
-    for await (const chunk of bthCmd.stderr) {
-      error += chunk;
-    }
-    let exitCode = await new Promise((resolve, reject) => {
-      bthCmd.on('close', resolve);
-    });
-
-    if (exitCode) {
-      let msg = `<amixer -D bluealsa sset ${volCtrlStr} ${value}> got ${data} - ${error}`;
-      log.error(msg);
+    let volValue;
+    if (fr) {
+      volValue = `frontleft ${fl}`;
+      await amixerSset(volCtrlStr, volValue);
+      volValue = `frontright ${fr}`;
+      await amixerSset(volCtrlStr, volValue);
     } else {
-      log.info(`bluealsa volume set to ${value}`);
+      volValue = fl;
+      await amixerSset(volCtrlStr, volValue);
     }
   }
 }
@@ -176,10 +189,11 @@ const saveBTVolume = async () => {
   for (let dev of content.bt.defaultVolume)
     if (dev.address === BTdevice.Address) {
       devFound = true;
-      dev.volume = BTdevice.volume;
+      dev.volumeRight = BTdevice.volumeRight;
+      dev.volumeLeft = BTdevice.volumeLeft;
     }
   if (!devFound)
-    content.bt.defaultVolume.push({ 'address': BTdevice.Address, 'volume': BTdevice.volume });
+    content.bt.defaultVolume.push({ 'address': BTdevice.Address, 'volumeRight': BTdevice.volumeRight, 'volumeLeft': BTdevice.volumeLeft });
   cfgfile.save(content);
 }
 
@@ -192,23 +206,25 @@ const volumeInc = async (balance) => {
       let volCtrlStr = `"${BTdevice.volCtrl}"`;
       let balance_option = '';
       if (balance == 'frontleft' || balance == 'frontright') balance_option = `${balance} `;
-      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, `${balance_option}1%+`]);
-      let data = "";
-      for await (const chunk of bthCmd.stdout)
-        data += chunk;
-      let error = "";
-      for await (const chunk of bthCmd.stderr) {
-        error += chunk;
-      }
-      let exitCode = await new Promise((resolve, reject) => {
-        bthCmd.on('close', resolve);
-      });
-
-      if (exitCode) {
-        let msg = `<amixer -D bluealsa sset ${volCtrlStr} 1%+> got ${data} - ${error}`;
-        log.error(msg);
-        return;
-      }
+      let volValue = `${balance_option}1%+`;
+      await amixerSset(volCtrlStr, volValue);
+      // let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, `${balance_option}1%+`]);
+      // let data = "";
+      // for await (const chunk of bthCmd.stdout)
+      //   data += chunk;
+      // let error = "";
+      // for await (const chunk of bthCmd.stderr) {
+      //   error += chunk;
+      // }
+      // let exitCode = await new Promise((resolve, reject) => {
+      //   bthCmd.on('close', resolve);
+      // });
+      // 
+      // if (exitCode) {
+      //   let msg = `<amixer -D bluealsa sset ${volCtrlStr} 1%+> got ${data} - ${error}`;
+      //   log.error(msg);
+      //   return;
+      // }
       await getBluealsaVolume();
       saveBTVolume();
     }
@@ -224,24 +240,26 @@ const volumeDec = async (balance) => {
       let volCtrlStr = `"${BTdevice.volCtrl}"`;
       let balance_option = '';
       if (balance == 'frontleft' || balance == 'frontright') balance_option = `${balance} `;
-      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, `${balance_option}1%-`]);
-      let data = "";
-      for await (const chunk of bthCmd.stdout)
-        data += chunk;
-      let error = "";
-      for await (const chunk of bthCmd.stderr) {
-        error += chunk;
-      }
-      let exitCode = await new Promise((resolve, reject) => {
-        bthCmd.on('close', resolve);
-      });
-
-      if (exitCode) {
-        let msg = `<amixer -D bluealsa sset ${volCtrlStr} 1%-> got ${data} - ${error}`;
-        log.error(msg);
-        reject(msg);
-        return;
-      }
+      let volValue = `${balance_option}1%-`;
+      await amixerSset(volCtrlStr, volValue);
+      //      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, `${balance_option}1%-`]);
+      //      let data = "";
+      //      for await (const chunk of bthCmd.stdout)
+      //        data += chunk;
+      //      let error = "";
+      //      for await (const chunk of bthCmd.stderr) {
+      //        error += chunk;
+      //      }
+      //      let exitCode = await new Promise((resolve, reject) => {
+      //        bthCmd.on('close', resolve);
+      //      });
+      //
+      //      if (exitCode) {
+      //        let msg = `<amixer -D bluealsa sset ${volCtrlStr} 1%-> got ${data} - ${error}`;
+      //        log.error(msg);
+      //        reject(msg);
+      //        return;
+      //      }
       await getBluealsaVolume();
       saveBTVolume();
     }
@@ -251,7 +269,7 @@ const volumeDec = async (balance) => {
 const volumeMute = async (val) => {
   // val = "mute" || "unmute"
   if (val !== "mute" && val !== "unmute") {
-    reject(`invalid command ${val}`);
+    // reject(`invalid command ${val}`);
     return;
   }
   let BTdevice = bth.selectedCtrl.ConnectedDevice;
@@ -259,23 +277,24 @@ const volumeMute = async (val) => {
   if (BTdevice.volCtrl) {
     if (BTdevice.volume != "0%") {
       let volCtrlStr = `"${BTdevice.volCtrl}"`;
-      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, val]);
-      let data = "";
-      for await (const chunk of bthCmd.stdout)
-        data += chunk;
-      let error = "";
-      for await (const chunk of bthCmd.stderr) {
-        error += chunk;
-      }
-      let exitCode = await new Promise((resolve, reject) => {
-        bthCmd.on('close', resolve);
-      });
-      if (exitCode) {
-        let msg = `<amixer -D bluealsa sset ${volCtrlStr} [mute|unmute]> got ${data} - ${error}`;
-        log.error(msg);
-        reject(msg);
-        return;
-      }
+      await amixerSset(volCtrlStr, val);
+      // let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, val]);
+      // let data = "";
+      // for await (const chunk of bthCmd.stdout)
+      //   data += chunk;
+      // let error = "";
+      // for await (const chunk of bthCmd.stderr) {
+      //   error += chunk;
+      // }
+      // let exitCode = await new Promise((resolve, reject) => {
+      //   bthCmd.on('close', resolve);
+      // });
+      // if (exitCode) {
+      //   let msg = `<amixer -D bluealsa sset ${volCtrlStr} [mute|unmute]> got ${data} - ${error}`;
+      //   log.error(msg);
+      //   reject(msg);
+      //   return;
+      // }
       await getBluealsaVolume();
     }
   }
@@ -302,7 +321,18 @@ const setDefaultVolume = async (address) => {
     for (let dev of content.bt.defaultVolume)
       if (dev.address === address) {
         log.info('setting bluealsa default value...');
-        await volumeSet(dev.volume);
+        let BTdevice = bth.selectedCtrl.ConnectedDevice;
+        if (BTdevice == null) return;
+        if (BTdevice.volCtrl) {
+          var doubleCheck = true;
+          while (doubleCheck) {
+            await setBluealsaVolume(dev.volumeLeft, dev.volumeRight);
+            await btWait(1000);
+            await getBluealsaVolume();
+            if (BTdevice.volumeLeft === dev.volumeLeft && BTdevice.volumeRight === dev.volumeRight) doubleCheck = false;
+          }
+        }
+        // await volumeSet(dev.volumeLeft, dev.volumeRight);
         return;
       }
   }
