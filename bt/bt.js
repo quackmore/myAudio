@@ -304,12 +304,12 @@ const volumeSet = async (value) => {
   let BTdevice = bth.selectedCtrl.ConnectedDevice;
   if (BTdevice == null) return;
   if (BTdevice.volCtrl) {
-    var doubleCheck = true;
-    while (doubleCheck) {
+    // try max 40 times
+    for (let idx = 0; idx < 40; idx++) {
       await setBluealsaVolume(value);
       await btWait(1000);
       await getBluealsaVolume();
-      if (BTdevice.volume === value) doubleCheck = false;
+      if (BTdevice.volume === value) break;
     }
     await saveBTVolume();
   }
@@ -324,12 +324,12 @@ const setDefaultVolume = async (address) => {
         let BTdevice = bth.selectedCtrl.ConnectedDevice;
         if (BTdevice == null) return;
         if (BTdevice.volCtrl) {
-          var doubleCheck = true;
-          while (doubleCheck) {
+          // try max 40 times
+          for (let idx = 0; idx < 40; idx++) {
             await setBluealsaVolume(dev.volumeLeft, dev.volumeRight);
             await btWait(1000);
             await getBluealsaVolume();
-            if (BTdevice.volumeLeft === dev.volumeLeft && BTdevice.volumeRight === dev.volumeRight) doubleCheck = false;
+            if (BTdevice.volumeLeft === dev.volumeLeft && BTdevice.volumeRight === dev.volumeRight) break;
           }
         }
         // await volumeSet(dev.volumeLeft, dev.volumeRight);
