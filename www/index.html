@@ -289,8 +289,13 @@
         await toutFetch(url, 5000, req);
         if (getOutput() === 'Speakers')
           refreshSpeakersStatus();
-        else
+        else {
+          if (player.bt.selectedCtrl.Powered === 'yes') {// 
+            url = 'bt/reset';
+            await toutFetch(url, 5000, req);
+          }
           setTimeout(refreshBtStatus, 500);
+        }
       }
       catch (err) {
         alert(err.message);
@@ -735,7 +740,7 @@
       if (document.getElementById('volRange').disabled) return;
       loadSpinner();
       let balance_option = 'none';
-      if(balance == 'frontleft' || balance == 'frontright') balance_option = balance;
+      if (balance == 'frontleft' || balance == 'frontright') balance_option = balance;
       if (getOutput() === 'Speakers') {
         try {
           await toutFetch(`/speakers/volume/inc`, 60000, { method: 'POST' });
@@ -759,7 +764,7 @@
       if (document.getElementById('volRange').disabled) return;
       loadSpinner();
       let balance_option = 'none';
-      if(balance == 'frontleft' || balance == 'frontright') balance_option = balance;
+      if (balance == 'frontleft' || balance == 'frontright') balance_option = balance;
       if (getOutput() === 'Speakers') {
         try {
           await toutFetch(`/speakers/volume/dec`, 60000, { method: 'POST' });
