@@ -279,7 +279,8 @@
     }
 
     async function outputSwitch() {
-      let url = getOutput() === 'Speakers' ? `/speakers/toggle` : `/bt/cmd/power%20${player.bt.selectedCtrl.Powered === 'yes' ? 'off' : 'on'}`;
+      let btPowered = player.bt.selectedCtrl.Powered;
+      let url = getOutput() === 'Speakers' ? `/speakers/toggle` : `/bt/cmd/power%20${btPowered === 'yes' ? 'off' : 'on'}`;
       let req = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
@@ -290,7 +291,7 @@
         if (getOutput() === 'Speakers')
           refreshSpeakersStatus();
         else {
-          if (player.bt.selectedCtrl.Powered === 'yes') {// 
+          if (btPowered === 'yes') {// 
             url = 'bt/reset';
             await toutFetch(url, 5000, req);
           }
