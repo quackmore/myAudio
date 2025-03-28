@@ -12,7 +12,7 @@
         "streamingPlaylist": "/home/flintheart/.config/mpd/playlists/streaming.m3u",
         "streamingReconnectTimeout": 10000,
         "streamingReconnectCount": 6,
-        "podcastDownloads": "/media/verbatim-ntfs/Music",
+        "podcastDownloads": "/home/flintheart/Music",
         "podcastRemovedAfterDays": 7
     },
     "speakers": {

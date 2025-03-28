@@ -68,7 +68,8 @@ async function addFileToQueue(name, url) {
         const fileWriterStream = fs.createWriteStream(fileName);
         downloadingFiles.push({ name: name, progress: '[0%]' })
         downloadStream.on("downloadProgress", ({ transferred, total, percent }) => {
-          const percentage = Math.round(percent * 100);
+          let percentage = 0;
+          if (transferred > 0) percentage = Math.round(percent * 100);
           // percentage info is enough
           // downloadingFiles.find(el => el.name === name).progress = `${transferred}/${total} (${percentage}%)`;
           downloadingFiles.find(el => el.name === name).progress = `[${percentage}%]`;

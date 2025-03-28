@@ -77,7 +77,7 @@
       <div class="center">
         <div style="width: 60%;">
           <input type="range" min="1" max="100" value="0" class="slider" id="elapsed" onchange="setPosition(this.value)"
-            onpointerdown="setUpdateElapsed(0);" onpointerup="setUpdateElapsed(1000);">
+            onmousedown="setUpdateElapsed(0);" onmouseup="setUpdateElapsed(1000);" ontouchstart="setUpdateElapsed(0);" ontouchend="setUpdateElapsed(1000);">
         </div>
         <span class="right" style="font-size: small;" id="duration"> </span>
       </div>
@@ -188,46 +188,46 @@
       <button class="cmdBtn" onclick="podSelCancel()">cancel</button>
       <button class="cmdBtn" onclick="podShowContent()" id="podSCBtn">show content</button>
     </div>
-    <div class="noGrowNoShrink right" style="width: 100%; height: 50px;">
+    <div class="noGrowNoShrink right" style="width: 100%; height: 60px;">
       <div class="right" id="queueFn">
         <div class="left" style="font-size: medium;">
           <span id="queueDuration"></span>
         </div>
         <div class="right">
-          <button onclick="initLiSelected()" id="cancel1" disabled>cancel</button>
-          <button onclick="saveQueue()">save</button>
-          <button onclick="clearQueue()">clear</button>
+          <button class="lowBoxButton" onclick="initLiSelected()" id="cancel1" disabled>cancel</button>
+          <button class="lowBoxButton" onclick="saveQueue()">save</button>
+          <button class="lowBoxButton" onclick="clearQueue()">clear</button>
         </div>
       </div>
       <div class="right" id="playlistsFn" style="display: none;">
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
-          <button onclick="listPlaylists()" id="cancel2" disabled>cancel</button>
+          <button class="lowBoxButton" onclick="listPlaylists()" id="cancel2" disabled>cancel</button>
         </div>
       </div>
       <div class="right" id="filesFn" style="display: none;">
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
-          <button onclick="initLiSelected()" id="cancel3" disabled>cancel</button>
-          <button onclick="goBack()" id="goBack" disabled>back</button>
+          <button class="lowBoxButton" onclick="initLiSelected()" id="cancel3" disabled>cancel</button>
+          <button class="lowBoxButton" onclick="goBack()" id="goBack" disabled>back</button>
         </div>
       </div>
       <div class="right" id="streamsFn" style="display: none;">
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
-          <button onclick="initLiSelected()" id="cancel4" disabled>cancel</button>
-          <button onclick="newStream()">new stream</button>
+          <button class="lowBoxButton" onclick="initLiSelected()" id="cancel4" disabled>cancel</button>
+          <button class="lowBoxButton" onclick="newStream()">new stream</button>
         </div>
       </div>
       <div class="right" id="podcastFn" style="display: none;">
         <div class="left" style="font-size: medium;">
         </div>
         <div class="right">
-          <button onclick="loadPodcasts()" id="cancel5">cancel</button>
-          <button onclick="newPodcast()">new podcast</button>
+          <button class="lowBoxButton" onclick="loadPodcasts()" id="cancel5">cancel</button>
+          <button class="lowBoxButton" onclick="newPodcast()">new podcast</button>
         </div>
       </div>
     </div>
@@ -879,7 +879,7 @@
     var liSelected = [];
     var multipleliSelect = false;
 
-    let liSelectTimeout = null;
+    var liSelectTimeout = null;
 
     function initLiSelected() {
       multipleliSelect = false;
@@ -924,7 +924,7 @@
         liSelected = [];
         liSelected.push(idx);
         document.getElementById(`li_${idx}`).style.backgroundColor = "lightblue";
-        liSelectTimeout = setTimeout(liSelectMultiple, 1000);
+        liSelectTimeout = setTimeout(liSelectMultiple, 2000);
       }
       // DEBUG
       // console.log(liSelected);
@@ -1004,7 +1004,7 @@
               if (parseFloat(item.duration))
                 queue.duration += parseFloat(item.duration);
               let qline = getQueueDes(item);
-              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
+              pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" ontouchstart="limd(${idx})" ontouchend="limu(${idx})" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
             }
             // DEBUG
             // console.log(queue);
@@ -1071,7 +1071,7 @@
           if (playlists.length) {
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of playlists.entries())
-              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${item.playlist}</li>`;
+              pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" ontouchstart="limd(${idx})" ontouchend="limu(${idx})" id="li_${idx}">${item.playlist}</li>`;
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
           } else
@@ -1098,7 +1098,7 @@
     function showPlaylistContent() {
       if (playlistSongs.length) {
         let pl_content = '<ul class="tabCntList">';
-        playlistSongs.map((el, idx) => pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${el.file}</li>`)
+        playlistSongs.map((el, idx) => pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" ontouchstart="limd(${idx})" ontouchend="limu(${idx})" id="li_${idx}">${el.file}</li>`)
         pl_content += "</ul>";
         document.getElementById("tabCt").innerHTML = pl_content;
       } else
@@ -1191,9 +1191,9 @@
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of files.entries()) {
               if (item.directory)
-                pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}"><button onclick="enterDir('${item.directory}')">${item.directory}</button></li>`;
+                pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" ontouchstart="limd(${idx})" ontouchend="limu(${idx})" id="li_${idx}"><button onclick="enterDir('${item.directory}')">${item.directory}</button></li>`;
               if (item.file)
-                pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${item.file}</li>`;
+                pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" ontouchstart="limd(${idx})" ontouchend="limu(${idx})" id="li_${idx}">${item.file}</li>`;
             }
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
@@ -1265,7 +1265,7 @@
           if (streams.length) {
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of streams.entries())
-              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${item.name} - <small><i>${item.url}</i></small></li>`;
+              pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" ontouchstart="limd(${idx})" ontouchend="limu(${idx})" id="li_${idx}">${item.name} - <small><i>${item.url}</i></small></li>`;
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
           } else
@@ -1397,7 +1397,7 @@
           if (podcasts.length) {
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of podcasts.entries())
-              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${item.name}</li>`;
+              pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" ontouchstart="limd(${idx})" ontouchend="limu(${idx})" id="li_${idx}">${item.name}</li>`;
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
           } else
@@ -1491,7 +1491,7 @@
     const showEpisodesList = () => {
       if (feed.length) {
         let pl_content = '<ul class="tabCntList">';
-        feed.map((el, idx) => pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx})" onpointerup="limu(${idx})" id="li_${idx}">${el.date} - ${el.title} ${el.duration ? '[' + secsToString(el.duration) + ']' : ''}</li><div id="liDesc_${idx}" class="modal" style="display: none;">${el.contentSnippet}</div>`)
+        feed.map((el, idx) => pl_content += `<li class="tabCntLine" onmousedown="limd(${idx})" onmouseup="limu(${idx})" ontouchstart="limd(${idx})" ontouchend="limu(${idx})" id="li_${idx}">${el.date} - ${el.title} ${el.duration ? '[' + secsToString(el.duration) + ']' : ''}</li><div id="liDesc_${idx}" class="modal" style="display: none;">${el.contentSnippet}</div>`)
         pl_content += "</ul>";
         document.getElementById("tabCt").innerHTML = pl_content;
       } else
