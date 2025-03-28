@@ -77,7 +77,8 @@
       <div class="center">
         <div style="width: 60%;">
           <input type="range" min="1" max="100" value="0" class="slider" id="elapsed" onchange="setPosition(this.value)"
-            onmousedown="setUpdateElapsed(0);" onmouseup="setUpdateElapsed(1000);" ontouchstart="setUpdateElapsed(0);" ontouchend="setUpdateElapsed(1000);">
+            onmousedown="setUpdateElapsed(0);" onmouseup="setUpdateElapsed(1000);" ontouchstart="setUpdateElapsed(0);"
+            ontouchend="setUpdateElapsed(1000);">
         </div>
         <span class="right" style="font-size: small;" id="duration"> </span>
       </div>
@@ -611,20 +612,18 @@
       if (player.bt.selectedCtrl.ConnectedDevice) {
         let connected = player.bt.selectedCtrl.ConnectedDevice;
         let batLevStr = '--';
-        let batIco = 'full';
-        if (connected.battery != '--') {
-          let batLev = 100;
-          if (connected.hasOwnProperty('battery'))
-            batLev = Number(connected.battery.split('%')[0]);
-          if (batLev >= 100)
-            batLevStr = '100%';
-          else
+        let batIco = 'quarter';
+        if (connected.battery == '--') {
+          batIco = 'full';
+        } else {
+          if (connected.hasOwnProperty('battery')) {
             batLevStr = connected.battery;
-          let batIco = 'quarter';
+            let batLev = Number(batLevStr.split('%')[0]);
             if (batLev > 80)
-            batIco = 'full';
-          else if (batLev > 30)
-            batIco = 'half';
+              batIco = 'full';
+            else if (batLev > 30)
+              batIco = 'half';
+          }
         }
         btDevName = `<span style="font-size: medium">${connected.Name}<br><i class="fa-regular fa-battery-${batIco}"></i>&nbsp&nbsp${batLevStr}</span>`;
       } else
