@@ -295,7 +295,7 @@
             url = 'bt/reset';
             await toutFetch(url, 5000, req);
           }
-          setTimeout(refreshBtStatus, 500);
+          setTimeout(refreshBtStatus, 1500);
         }
       }
       catch (err) {
@@ -610,19 +610,22 @@
     const updateBTdesc = () => {
       if (player.bt.selectedCtrl.ConnectedDevice) {
         let connected = player.bt.selectedCtrl.ConnectedDevice;
-        let batLev = 100;
-        let batLevStr = '100%';
-        let batIco = 'quarter';
-        if (connected.hasOwnProperty('battery'))
-          batLev = Number(connected.battery.split('%')[0]);
-        if (batLev >= 100)
-          batLevStr = '100%';
-        else
-          batLevStr = connected.battery;
-        if (batLev > 80)
-          batIco = 'full';
-        else if (batLev > 30)
-          batIco = 'half';
+        let batLevStr = '--';
+        let batIco = 'full';
+        if (connected.battery != '--') {
+          let batLev = 100;
+          if (connected.hasOwnProperty('battery'))
+            batLev = Number(connected.battery.split('%')[0]);
+          if (batLev >= 100)
+            batLevStr = '100%';
+          else
+            batLevStr = connected.battery;
+          let batIco = 'quarter';
+            if (batLev > 80)
+            batIco = 'full';
+          else if (batLev > 30)
+            batIco = 'half';
+        }
         btDevName = `<span style="font-size: medium">${connected.Name}<br><i class="fa-regular fa-battery-${batIco}"></i>&nbsp&nbsp${batLevStr}</span>`;
       } else
         btDevName = btDevDefault;

@@ -3,7 +3,7 @@ import cfgfile from '../cfgfile/cfgfile.js';
 import stripAnsi from 'strip-ansi';
 import EventEmitter from 'events';
 import { spawn } from "child_process";
-// const { resolve } from 'path');
+import cfg from 'config';
 
 var bth = null;
 
@@ -13,13 +13,6 @@ var bthLog = [];
 const bthLogger = (line) => {
   if (bthLog.length == bthLogMaxLen) bthLog.shift();
   bthLog.push(line);
-}
-
-const devName = (dev) => {
-  if (dev == undefined)
-    return `${bth.controller.connected.hasOwnProperty('name') ? bth.controller.connected.name : bth.controller.connected.Address}`;
-  else
-    return `${dev.hasOwnProperty('Name') ? dev.name : dev.Address}`;
 }
 
 var btTimer = null;
@@ -41,10 +34,6 @@ const getBluealsaControls = async () => {
       BTdevice.volCtrl = line.toString().split("'")[1];
       log.info(`found A2DP control ${BTdevice.volCtrl}`);
     }
-    if (line.toString().includes("Battery")) {
-      BTdevice.batCtrl = line.toString().split("'")[1];
-      log.info(`found battery control ${BTdevice.batCtrl}`);
-    }
   }
   let error = "";
   for await (const chunk of bthCmd.stderr) {
@@ -60,42 +49,46 @@ const getBluealsaControls = async () => {
   }
 }
 
-const getBluealsaBattery = async () => {
+const getBattery = async () => {
   let BTdevice = bth.selectedCtrl.ConnectedDevice;
   if (BTdevice == null) return;
-  if (BTdevice.batCtrl) {
-    let batCtrl = `"${BTdevice.batCtrl}"`;
-    let bthCmd = spawn("amixer", ["-D", "bluealsa", "sget", batCtrl]);
-    let data = "";
-    for await (const chunk of bthCmd.stdout)
-      data += chunk;
-    let batLevel = "";
-    for (let line of data.toString().split('\n')) {
-      if (line.toString().length < 2) continue;
-      batLevel = line.toString();
+  BTdevice.battery = '--';
+  if (!cfg.has('player.bt_battery')) return;
+  let bthCmd = spawn("python3", [`${cfg.get('player.bt_battery')}`, `${BTdevice.Address}`]);
+  let data = "";
+  for await (const chunk of bthCmd.stdout)
+    data += chunk;
+  for (let line of data.toString().split('\n')) {
+    if (line.toString().includes("Battery level")) {
+      BTdevice.battery = line.toString().split(":")[1];
+      log.info(`Battery level: ${BTdevice.battery}`);
     }
-    if (batLevel.length > 5) {
-      BTdevice.battery = batLevel.match(/\[(.*?)\]/)[1];
-      log.info(`${BTdevice.Name} battery level ${BTdevice.battery}`);
+    if (line.toString().includes("Address")) {
+      let addr = line.toString().slice(line.toString().indexOf(':') + 1);
+      log.info(`Querying ${addr} for battery level`);
     }
-    let error = "";
-    for await (const chunk of bthCmd.stderr) {
-      error += chunk;
+    if (line.toString().includes("Port")) {
+      let port = line.toString().split(":")[1];
+      log.info(`${BTdevice.Address} replied on port ${port}`);
     }
-    let exitCode = await new Promise((resolve, reject) => {
-      bthCmd.on('close', resolve);
-    });
+  }
+  let error = "";
+  for await (const chunk of bthCmd.stderr) {
+    error += chunk;
+  }
+  let exitCode = await new Promise((resolve, reject) => {
+    bthCmd.on('close', resolve);
+  });
 
-    if (exitCode) {
-      let msg = `<amixer -D bluealsa sget '${BTdevice.batCtrl}'> got ${data} - ${error}`;
-      log.error(msg);
-    }
+  if (exitCode) {
+    let msg = `<python3 ${cfg.get(player.bt_battery)} ${BTdevice.Address}> got ${data} - ${error}`;
+    log.error(msg);
   }
 }
 
 const updateBattery = async () => {
   if (bth.selectedCtrl.ConnectedDevice) {
-    await getBluealsaBattery();
+    await getBattery();
     btUpdateBatteryTimer = setTimeout(updateBattery, 60000);
   }
 }
@@ -208,23 +201,6 @@ const volumeInc = async (balance) => {
       if (balance == 'frontleft' || balance == 'frontright') balance_option = `${balance} `;
       let volValue = `${balance_option}1%+`;
       await amixerSset(volCtrlStr, volValue);
-      // let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, `${balance_option}1%+`]);
-      // let data = "";
-      // for await (const chunk of bthCmd.stdout)
-      //   data += chunk;
-      // let error = "";
-      // for await (const chunk of bthCmd.stderr) {
-      //   error += chunk;
-      // }
-      // let exitCode = await new Promise((resolve, reject) => {
-      //   bthCmd.on('close', resolve);
-      // });
-      // 
-      // if (exitCode) {
-      //   let msg = `<amixer -D bluealsa sset ${volCtrlStr} 1%+> got ${data} - ${error}`;
-      //   log.error(msg);
-      //   return;
-      // }
       await getBluealsaVolume();
       saveBTVolume();
     }
@@ -242,24 +218,6 @@ const volumeDec = async (balance) => {
       if (balance == 'frontleft' || balance == 'frontright') balance_option = `${balance} `;
       let volValue = `${balance_option}1%-`;
       await amixerSset(volCtrlStr, volValue);
-      //      let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, `${balance_option}1%-`]);
-      //      let data = "";
-      //      for await (const chunk of bthCmd.stdout)
-      //        data += chunk;
-      //      let error = "";
-      //      for await (const chunk of bthCmd.stderr) {
-      //        error += chunk;
-      //      }
-      //      let exitCode = await new Promise((resolve, reject) => {
-      //        bthCmd.on('close', resolve);
-      //      });
-      //
-      //      if (exitCode) {
-      //        let msg = `<amixer -D bluealsa sset ${volCtrlStr} 1%-> got ${data} - ${error}`;
-      //        log.error(msg);
-      //        reject(msg);
-      //        return;
-      //      }
       await getBluealsaVolume();
       saveBTVolume();
     }
@@ -278,23 +236,6 @@ const volumeMute = async (val) => {
     if (BTdevice.volume != "0%") {
       let volCtrlStr = `"${BTdevice.volCtrl}"`;
       await amixerSset(volCtrlStr, val);
-      // let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", volCtrlStr, val]);
-      // let data = "";
-      // for await (const chunk of bthCmd.stdout)
-      //   data += chunk;
-      // let error = "";
-      // for await (const chunk of bthCmd.stderr) {
-      //   error += chunk;
-      // }
-      // let exitCode = await new Promise((resolve, reject) => {
-      //   bthCmd.on('close', resolve);
-      // });
-      // if (exitCode) {
-      //   let msg = `<amixer -D bluealsa sset ${volCtrlStr} [mute|unmute]> got ${data} - ${error}`;
-      //   log.error(msg);
-      //   reject(msg);
-      //   return;
-      // }
       await getBluealsaVolume();
     }
   }
@@ -567,7 +508,7 @@ const bluetoothctlStop = () => {
   btEvent.emit(events.BT_END);
 }
 
-const btAvailForConn = async () => {
+const controllerScanOn = async () => {
   await btWait(200);
   bluetoothctlInput('discoverable on');
   if (bth.selectedCtrl.Pairable && bth.selectedCtrl.Pairable == 'no') {
@@ -578,7 +519,7 @@ const btAvailForConn = async () => {
   bluetoothctlInput('scan on');
 }
 
-const btNotAvailForConn = async () => {
+const controllerScanOff = async () => {
   if (bth.selectedCtrl.Pairable && bth.selectedCtrl.Pairable == 'yes') {
     bluetoothctlInput('discoverable off');
   }
@@ -612,20 +553,19 @@ btEvent.on(events.BT_END, address => {
 
 btEvent.on(events.BT_POWERON, async () => {
   log.info("BT powered on...");
-  btAvailForConn();
+  controllerScanOn();
 })
 
 btEvent.on(events.BT_POWEROFF, () => {
   log.info("BT powered off...");
-  btNotAvailForConn();
+  controllerScanOff();
   if (bth.selectedCtrl != null && bth.selectedCtrl.ConnectedDevice != null) bth.selectedCtrl.ConnectedDevice = null;
 })
 
 btEvent.on(events.DEV_CONNECTED, async address => {
   log.info(`device ${address} connected`);
-  btNotAvailForConn();
+  await updateBattery();
   let cnt = 0;
-  // while (!bth.selectedCtrl.ConnectedDevice.hasOwnProperty('batCtrl') || !bth.selectedCtrl.ConnectedDevice.hasOwnProperty('volCtrl')) {
   while (!bth.selectedCtrl.ConnectedDevice.hasOwnProperty('volCtrl')) {
     await btWait(1000);
     log.info('inspecting bluealsa controls...');
@@ -634,16 +574,11 @@ btEvent.on(events.DEV_CONNECTED, async address => {
     if (cnt > 30) break;
   }
   if (cnt < 30) {
-    if (bth.selectedCtrl.ConnectedDevice.hasOwnProperty('batCtrl')) {
-      await getBluealsaBattery();
-      // periodically update battery level
-      if (btUpdateBatteryTimer) clearTimeout(btUpdateBatteryTimer);
-      btUpdateBatteryTimer = setTimeout(updateBattery, 60000);
-    }
     await getBluealsaVolume();
     await saveLastDeviceConnected(address);
     await setDefaultVolume(address);
     btEvent.emit(events.DEV_AVAILABLE, address);
+    controllerScanOff();
   } else {
     log.error("didn't find any bluealsa controls");
   }
@@ -656,13 +591,12 @@ btEvent.on(events.DEV_AVAILABLE, async address => {
 btEvent.on(events.DEV_DISCONNECTED, async address => {
   log.info(`device ${address} disconnected`);
   let dev = bth.devices.find(item => item.Address == address);
-  if (dev.batCtrl) delete dev.batCtrl;
   if (dev.battery) delete dev.battery;
   if (dev.volCtrl) delete dev.volCtrl;
   if (dev.volume) delete dev.volume;
   if (dev.mute) delete dev.mute;
   await btWait(200);
-  if (bth.selectedCtrl.Powered == 'yes') btAvailForConn();
+  if (bth.selectedCtrl.Powered == 'yes') controllerScanOn();
 })
 
 export default {

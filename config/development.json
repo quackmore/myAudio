@@ -8,7 +8,7 @@
     },
     "player": {
         "bt_output": "Bluetooth",
-        "alsaCfgFile": "/home/flintheart/.asoundrc",
+        "bt_battery": "/home/flintheart/bin/bt-battery.py",
         "streamingPlaylist": "/home/flintheart/.config/mpd/playlists/streaming.m3u",
         "streamingReconnectTimeout": 10000,
         "streamingReconnectCount": 6,
