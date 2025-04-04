@@ -89,7 +89,8 @@ const getBattery = async () => {
 const updateBattery = async () => {
   if (bth.selectedCtrl.ConnectedDevice) {
     await getBattery();
-    btUpdateBatteryTimer = setTimeout(updateBattery, 60000);
+    if (btUpdateBatteryTimer == null)
+      btUpdateBatteryTimer = setInterval(updateBattery, 60000);
   }
 }
 
@@ -548,7 +549,10 @@ btEvent.on(events.BT_START, async () => {
 
 btEvent.on(events.BT_END, address => {
   log.info("ending bluetoothctl...");
-  if (btTimer) clearTimeout(btTimer);
+  if (btTimer) {
+    clearTimeout(btTimer);
+    btTimer = null;
+  }
 })
 
 btEvent.on(events.BT_POWERON, async () => {
@@ -559,7 +563,11 @@ btEvent.on(events.BT_POWERON, async () => {
 btEvent.on(events.BT_POWEROFF, () => {
   log.info("BT powered off...");
   controllerScanOff();
-  if (bth.selectedCtrl != null && bth.selectedCtrl.ConnectedDevice != null) bth.selectedCtrl.ConnectedDevice = null;
+  if (bth.selectedCtrl != null && bth.selectedCtrl.ConnectedDevice != null) {
+    bth.selectedCtrl.ConnectedDevice = null;
+    clearInterval(btUpdateBatteryTimer);
+    btUpdateBatteryTimer = null;
+  }
 })
 
 btEvent.on(events.DEV_CONNECTED, async address => {
@@ -595,6 +603,10 @@ btEvent.on(events.DEV_DISCONNECTED, async address => {
   if (dev.volCtrl) delete dev.volCtrl;
   if (dev.volume) delete dev.volume;
   if (dev.mute) delete dev.mute;
+  if (btUpdateBatteryTimer) {
+    clearInterval(btUpdateBatteryTimer);
+    btUpdateBatteryTimer = null;
+  }
   await btWait(200);
   if (bth.selectedCtrl.Powered == 'yes') controllerScanOn();
 })

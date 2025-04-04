@@ -7,22 +7,6 @@ import cfg from 'config';
 import bt from '../bt/bt.js';
 import fs from 'fs';
 
-
-bt.event.on(bt.events.DEV_CONNECTED, async address => {
-  // await updateAlsaBtCfg(address);
-  if (cfg.has('player.bt_output')) {
-    log.info(`enabling mpd output ${cfg.get('player.bt_output')}`);
-    await output(['enableoutput', cfg.get('player.bt_output')]);
-  }
-})
-
-bt.event.on(bt.events.DEV_DISCONNECTED, async address => {
-  if (cfg.has('player.bt_output')) {
-    log.info(`disabling mpd output ${cfg.get('player.bt_output')}`);
-    await output(['disableoutput', cfg.get('player.bt_output')]);
-  }
-})
-
 var mpdSt = {};
 
 function parseObj(txt) {
@@ -272,6 +256,25 @@ async function restart() {
   } else
     log.info("mpd restarted");
 }
+
+bt.event.on(bt.events.DEV_CONNECTED, async address => {
+  // await updateAlsaBtCfg(address);
+  if (cfg.has('player.bt_output')) {
+    log.info(`enabling mpd output ${cfg.get('player.bt_output')}`);
+    await output(['enableoutput', cfg.get('player.bt_output')]);
+    if (mpdSt.status.state === 'play') {
+      await playCmd('stop', []);
+      await playCmd('play', []);
+    }
+  }
+})
+
+bt.event.on(bt.events.DEV_DISCONNECTED, async address => {
+  if (cfg.has('player.bt_output')) {
+    log.info(`disabling mpd output ${cfg.get('player.bt_output')}`);
+    await output(['disableoutput', cfg.get('player.bt_output')]);
+  }
+})
 
 export default {
   status: updateStatus,

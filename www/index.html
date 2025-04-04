@@ -1180,6 +1180,18 @@
       let url = "/mpd/listinfo/listfiles" + curPath;
       toutFetch(`/mpd/listinfo/listfiles/${encodeURIComponent(curPath)}`, 5000)
         .then(data => data.json())
+        .then(data => {
+          data.sort((a, b) => {
+            let aa = a.hasOwnProperty('directory') ? a.directory : a.file;
+            let bb = b.hasOwnProperty('directory') ? b.directory : a.file;
+            if (aa < bb) return -1;
+            if (aa > bb) return 1;
+            return 0;
+          });
+
+          console.log(data);
+          return data;
+        })
         .then(data => data.filter((el) => {
           if (el.directory) return true;
           if (el.file) return musicExts.includes(el.file.split('.').pop())
@@ -1260,7 +1272,7 @@
             if (a.name < b.name) return -1;
             if (a.name > b.name) return 1;
             return 0;
-          });;
+          });
           if (streams.length) {
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of streams.entries())
