@@ -603,10 +603,8 @@ btEvent.on(events.DEV_DISCONNECTED, async address => {
   if (dev.volCtrl) delete dev.volCtrl;
   if (dev.volume) delete dev.volume;
   if (dev.mute) delete dev.mute;
-  if (btUpdateBatteryTimer) {
-    clearInterval(btUpdateBatteryTimer);
-    btUpdateBatteryTimer = null;
-  }
+  clearInterval(btUpdateBatteryTimer);
+  btUpdateBatteryTimer = null;
   await btWait(200);
   if (bth.selectedCtrl.Powered == 'yes') controllerScanOn();
 })
