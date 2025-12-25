@@ -1183,10 +1183,8 @@
         .then(data => {
           let dataSorted = data.sort((a, b) => {
             let aa = a.hasOwnProperty('directory') ? a.directory : a.file;
-            let bb = b.hasOwnProperty('directory') ? b.directory : a.file;
-            if (aa < bb) return -1;
-            if (aa > bb) return 1;
-            return 0;
+            let bb = b.hasOwnProperty('directory') ? b.directory : b.file;
+            return aa.localeCompare(bb, undefined, { numeric: true });
           });
           return dataSorted;
         })
