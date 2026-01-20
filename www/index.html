@@ -901,11 +901,18 @@
     }
 
     const limu = (val) => {
-      clearTimeout(liSelectTimeout);
+      if (liSelectTimeout) {
+        clearTimeout(liSelectTimeout);
+        liSelectTimeout = null;
+      }
     }
 
     function limd(idx, event) {
-      // if (event) event.preventDefault();
+      if (event) event.preventDefault();
+      if (liSelectTimeout) {
+        clearTimeout(liSelectTimeout);
+        liSelectTimeout = null;
+      }
       if (multipleliSelect) {
         if (liSelected.includes(idx)) {
           liSelected.splice(liSelected.indexOf(idx), 1);
@@ -929,7 +936,7 @@
         liSelected = [];
         liSelected.push(idx);
         document.getElementById(`li_${idx}`).style.backgroundColor = "lightblue";
-        liSelectTimeout = setTimeout(liSelectMultiple, 500);
+        liSelectTimeout = setTimeout(liSelectMultiple, 800);
       }
       // DEBUG
       // console.log(liSelected);
@@ -1009,7 +1016,7 @@
               if (parseFloat(item.duration))
                 queue.duration += parseFloat(item.duration);
               let qline = getQueueDes(item);
-              pl_content += `<li class="tabCntLine" onmousedown="limd(${idx}, event)" onmouseup="limu(${idx})" ontouchstart="limd(${idx}, event)" ontouchend="limu(${idx})" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
+              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
             }
             // DEBUG
             // console.log(queue);
@@ -1076,7 +1083,7 @@
           if (playlists.length) {
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of playlists.entries())
-              pl_content += `<li class="tabCntLine" onmousedown="limd(${idx}, event)" onmouseup="limu(${idx})" ontouchstart="limd(${idx}, event)" ontouchend="limu(${idx})" id="li_${idx}">${item.playlist}</li>`;
+              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${item.playlist}</li>`;
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
           } else
@@ -1103,7 +1110,7 @@
     function showPlaylistContent() {
       if (playlistSongs.length) {
         let pl_content = '<ul class="tabCntList">';
-        playlistSongs.map((el, idx) => pl_content += `<li class="tabCntLine" onmousedown="limd(${idx}, event)" onmouseup="limu(${idx})" ontouchstart="limd(${idx}, event)" ontouchend="limu(${idx})" id="li_${idx}">${el.file}</li>`)
+        playlistSongs.map((el, idx) => pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${el.file}</li>`)
         pl_content += "</ul>";
         document.getElementById("tabCt").innerHTML = pl_content;
       } else
@@ -1204,9 +1211,9 @@
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of files.entries()) {
               if (item.directory)
-                pl_content += `<li class="tabCntLine" onmousedown="limd(${idx}, event)" onmouseup="limu(${idx})" ontouchstart="limd(${idx}, event)" ontouchend="limu(${idx})" id="li_${idx}"><button onclick="enterDir('${item.directory}')">${item.directory}</button></li>`;
+                pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}"><button onclick="enterDir('${item.directory}')">${item.directory}</button></li>`;
               if (item.file)
-                pl_content += `<li class="tabCntLine" onmousedown="limd(${idx}, event)" onmouseup="limu(${idx})" ontouchstart="limd(${idx}, event)" ontouchend="limu(${idx})" id="li_${idx}">${item.file}</li>`;
+                pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${item.file}</li>`;
             }
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
@@ -1278,7 +1285,7 @@
           if (streams.length) {
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of streams.entries())
-              pl_content += `<li class="tabCntLine" onmousedown="limd(${idx}, event)" onmouseup="limu(${idx})" ontouchstart="limd(${idx}, event)" ontouchend="limu(${idx})" id="li_${idx}">${item.name} - <small><i>${item.url}</i></small></li>`;
+              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${item.name} - <small><i>${item.url}</i></small></li>`;
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
           } else
@@ -1410,7 +1417,7 @@
           if (podcasts.length) {
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of podcasts.entries())
-              pl_content += `<li class="tabCntLine" onmousedown="limd(${idx}, event)" onmouseup="limu(${idx})" ontouchstart="limd(${idx}, event)" ontouchend="limu(${idx})" id="li_${idx}">${item.name}</li>`;
+              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${item.name}</li>`;
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
           } else
@@ -1504,7 +1511,7 @@
     const showEpisodesList = () => {
       if (feed.length) {
         let pl_content = '<ul class="tabCntList">';
-        feed.map((el, idx) => pl_content += `<li class="tabCntLine" onmousedown="limd(${idx}, event)" onmouseup="limu(${idx})" ontouchstart="limd(${idx}, event)" ontouchend="limu(${idx})" id="li_${idx}">${el.date} - ${el.title} ${el.duration ? '[' + secsToString(el.duration) + ']' : ''}</li><div id="liDesc_${idx}" class="modal" style="display: none;">${el.contentSnippet}</div>`)
+        feed.map((el, idx) => pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${el.date} - ${el.title} ${el.duration ? '[' + secsToString(el.duration) + ']' : ''}</li><div id="liDesc_${idx}" class="modal" style="display: none;">${el.contentSnippet}</div>`)
         pl_content += "</ul>";
         document.getElementById("tabCt").innerHTML = pl_content;
       } else
