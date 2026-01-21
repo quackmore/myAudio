@@ -1,14 +1,17 @@
 body {
     font-family: "Lato", sans-serif;
     font-size: 14pt;
-    width: 95vw;
-    height: 97vh;
+    width: 100vw;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     align-items: center;
     margin: 0;
-    padding: 10px;
+    padding: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    /* Prevent any overflow */
 }
 
 .column {
@@ -40,23 +43,28 @@ body {
 .upBox {
     flex: 0 0 auto;
     border: 1px solid blue;
-    width: 100%;
+    width: calc(100% - 20px);
+    /* Account for horizontal margins/padding */
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 10px 0px;
-    margin-bottom: 1px;
+    margin: 10px 10px 1px 10px;
+    /* Add margins instead of body padding */
+    box-sizing: border-box;
 }
 
 .lowBox {
-    flex: 1 0 auto;
+    flex: 1 1 auto;
     border: 1px solid blue;
-    width: 100%;
-    height: max-content;
+    width: calc(100% - 20px);
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: start;
+    margin: 0 10px 10px 10px;
+    overflow: auto;
+    box-sizing: border-box; /* Include borders in width */
 }
 
 .fixedWidth {
@@ -120,6 +128,7 @@ body {
 
 .noGrowNoShrink {
     flex: 0 0 auto;
+    margin: 0;
 }
 
 .cmdLine {
@@ -200,7 +209,6 @@ body {
 .tabContent {
     flex: 1 1 0;
     display: flex;
-    height: 100%;
     width: 100%;
     overflow: auto;
     border-top: 1px solid #1b3252;
