@@ -879,6 +879,67 @@
     var multipleliSelect = false;
 
     var liSelectTimeout = null;
+    let isScrolling = false;
+
+    function initEventListeners() {
+      const tabCt = document.getElementById("tabCt");
+
+      // this is not necessary if you only call this once during initialization
+      // Remove any existing listeners if you're calling this multiple times
+      // (or better, only set these up once in your initialization code)
+      // tabCt.removeEventListener('pointerdown', handlePointerDown);
+      // tabCt.removeEventListener('pointerup', handlePointerUp);
+
+      // Add delegated event listeners
+      // the { passive: option} and 'poinercancel' and 'scroll' events are KEY to properly manage long-press on mobile
+      tabCt.addEventListener('pointerdown', handlePointerDown, { passive: true });
+      tabCt.addEventListener('pointerup', handlePointerUp, { passive: true });
+      tabCt.addEventListener('pointercancel', handlePointerCancel, { passive: true });
+      tabCt.addEventListener('scroll', handleScroll, { passive: true });
+    }
+
+    function handlePointerDown(event) {
+      const li = event.target.closest('.tabCntLine');
+      if (li) {
+        const idx = parseInt(li.dataset.idx, 10);
+        isScrolling = false;
+        // Clear any existing timeout
+        if (liSelectTimeout) {
+          clearTimeout(liSelectTimeout);
+          liSelectTimeout = null;
+        }
+        limd(idx, event);
+      }
+    }
+
+    function handlePointerUp(event) {
+      const li = event.target.closest('.tabCntLine');
+      if (li) {
+        const idx = parseInt(li.dataset.idx, 10);
+        // Only call limu if we're not scrolling
+        if (!isScrolling) {
+          limu(idx);
+        }
+      }
+    }
+
+    function handlePointerCancel(event) {
+      // Pointer was cancelled (usually due to scrolling)
+      // Clear the timeout to prevent false long-press
+      if (liSelectTimeout) {
+        clearTimeout(liSelectTimeout);
+        liSelectTimeout = null;
+      }
+    }
+
+    function handleScroll(event) {
+      // User is scrolling - cancel any pending long-press
+      isScrolling = true;
+      if (liSelectTimeout) {
+        clearTimeout(liSelectTimeout);
+        liSelectTimeout = null;
+      }
+    }
 
     function initLiSelected() {
       multipleliSelect = false;
@@ -908,11 +969,6 @@
     }
 
     function limd(idx, event) {
-      if (event) event.preventDefault();
-      if (liSelectTimeout) {
-        clearTimeout(liSelectTimeout);
-        liSelectTimeout = null;
-      }
       if (multipleliSelect) {
         if (liSelected.includes(idx)) {
           liSelected.splice(liSelected.indexOf(idx), 1);
@@ -936,7 +992,7 @@
         liSelected = [];
         liSelected.push(idx);
         document.getElementById(`li_${idx}`).style.backgroundColor = "lightblue";
-        liSelectTimeout = setTimeout(liSelectMultiple, 1000);
+        liSelectTimeout = setTimeout(liSelectMultiple, 700);
       }
       // DEBUG
       // console.log(liSelected);
@@ -1016,7 +1072,7 @@
               if (parseFloat(item.duration))
                 queue.duration += parseFloat(item.duration);
               let qline = getQueueDes(item);
-              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
+              pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
             }
             // DEBUG
             // console.log(queue);
@@ -1083,7 +1139,7 @@
           if (playlists.length) {
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of playlists.entries())
-              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${item.playlist}</li>`;
+              pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${item.playlist}</li>`;
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
           } else
@@ -1110,7 +1166,7 @@
     function showPlaylistContent() {
       if (playlistSongs.length) {
         let pl_content = '<ul class="tabCntList">';
-        playlistSongs.map((el, idx) => pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${el.file}</li>`)
+        playlistSongs.map((el, idx) => pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${el.file}</li>`)
         pl_content += "</ul>";
         document.getElementById("tabCt").innerHTML = pl_content;
       } else
@@ -1211,9 +1267,9 @@
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of files.entries()) {
               if (item.directory)
-                pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}"><button onclick="enterDir('${item.directory}')">${item.directory}</button></li>`;
+                pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}"><button onclick="enterDir('${item.directory}')">${item.directory}</button></li>`;
               if (item.file)
-                pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${item.file}</li>`;
+                pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${item.file}</li>`;
             }
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
@@ -1285,7 +1341,7 @@
           if (streams.length) {
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of streams.entries())
-              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${item.name} - <small><i>${item.url}</i></small></li>`;
+              pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${item.name} - <small><i>${item.url}</i></small></li>`;
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
           } else
@@ -1417,7 +1473,7 @@
           if (podcasts.length) {
             let pl_content = '<ul class="tabCntList">';
             for ([idx, item] of podcasts.entries())
-              pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${item.name}</li>`;
+              pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${item.name}</li>`;
             pl_content += "</ul>";
             document.getElementById("tabCt").innerHTML = pl_content;
           } else
@@ -1511,7 +1567,7 @@
     const showEpisodesList = () => {
       if (feed.length) {
         let pl_content = '<ul class="tabCntList">';
-        feed.map((el, idx) => pl_content += `<li class="tabCntLine" onpointerdown="limd(${idx}, event)" onpointerup="limu(${idx})" id="li_${idx}">${el.date} - ${el.title} ${el.duration ? '[' + secsToString(el.duration) + ']' : ''}</li><div id="liDesc_${idx}" class="modal" style="display: none;">${el.contentSnippet}</div>`)
+        feed.map((el, idx) => pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${el.date} - ${el.title} ${el.duration ? '[' + secsToString(el.duration) + ']' : ''}</li><div id="liDesc_${idx}" class="modal" style="display: none;">${el.contentSnippet}</div>`)
         pl_content += "</ul>";
         document.getElementById("tabCt").innerHTML = pl_content;
       } else
@@ -1612,6 +1668,7 @@
       await getMpdStatus();
       await updateMpdPlayer();
 
+      initEventListeners();
       loadQueue();
       periodicRefreshStatus(30000);
       unloadSpinner();
