@@ -1,5 +1,5 @@
 import express from 'express';
-import podcast from '../podcast/podcast.js';
+import podcast from '../services/podcast.js';
 
 const router = express.Router();
 

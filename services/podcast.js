@@ -1,13 +1,13 @@
 import RSSParser from 'rss-parser';
 import fs from 'fs';
-import log from '../logger/logger.js';
+import log from '../services/logger.js';
 import cfgFilesRoot from '../utils/cfgFilesRoot.js';
 import cfg from 'config';
 import path from 'path';
 import got from 'got';
 import stream from 'stream';
 import { promisify } from 'util';
-import mpd from '../mpd/mpd.js';
+import mpd from '../services/mpd.js';
 
 const pipeline = promisify(stream.pipeline);
 

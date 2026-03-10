@@ -1,5 +1,5 @@
 import web from './web.js';
-import log from '../logger/logger.js';
+import log from './logger.js';
 import http from 'http';
 import config from 'config';
 

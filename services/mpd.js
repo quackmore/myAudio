@@ -1,10 +1,10 @@
 import mpd from 'mpd';
 const cmd = mpd.cmd;
 // import { resolve } from 'path';
-import log from '../logger/logger.js';
+import log from './logger.js';
 import { spawn } from "child_process";
 import cfg from 'config';
-import bt from '../bt/bt.js';
+import bt from './bt.js';
 import fs from 'fs';
 
 var mpdSt = {};
@@ -259,21 +259,21 @@ async function restart() {
 
 bt.event.on(bt.events.DEV_CONNECTED, async address => {
   // await updateAlsaBtCfg(address);
-  if (cfg.has('player.bt_output')) {
-    log.info(`enabling mpd output ${cfg.get('player.bt_output')}`);
-    await output(['enableoutput', cfg.get('player.bt_output')]);
+//   if (cfg.has('player.bt_output')) {
+//     log.info(`enabling mpd output ${cfg.get('player.bt_output')}`);
+//     await output(['enableoutput', cfg.get('player.bt_output')]);
     if (mpdSt.status.state === 'play') {
       await playCmd('stop', []);
       await playCmd('play', []);
     }
-  }
+//  }
 })
 
 bt.event.on(bt.events.DEV_DISCONNECTED, async address => {
-  if (cfg.has('player.bt_output')) {
-    log.info(`disabling mpd output ${cfg.get('player.bt_output')}`);
-    await output(['disableoutput', cfg.get('player.bt_output')]);
-  }
+//  if (cfg.has('player.bt_output')) {
+//    log.info(`disabling mpd output ${cfg.get('player.bt_output')}`);
+//    await output(['disableoutput', cfg.get('player.bt_output')]);
+//  }
 })
 
 export default {
