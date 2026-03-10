@@ -1,4 +1,4 @@
-import log from '../logger/logger.js';
+import log from './logger.js';
 import path from 'path';
 import fs from 'fs';
 import cfgFilesRoot from '../utils/cfgFilesRoot.js';
