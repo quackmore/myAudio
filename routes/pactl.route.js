@@ -33,4 +33,16 @@ router.post('/volume/mute/:val', async function (req, res, next) {
     .catch(err => res.status(500).send(err.message));
 });
 
+router.get('/status', async function (req, res, next) {
+  try {
+    const [volRaw, sinkRaw] = await Promise.all([
+      pactl.volumeGet(),
+      pactl.getDefaultSink(),
+    ]);
+    res.json({ ...volRaw, ...sinkRaw });
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 export default router;

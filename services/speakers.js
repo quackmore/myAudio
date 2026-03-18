@@ -33,7 +33,7 @@ async function toggle() {
     res = await espFetch(url, 5000, req);
     speakers.speakerOn = (speakers.speakerOn === 'on' ? 'off' : 'on');
     if (speakers.speakerOn === 'on') {
-      await pactl.setDefaultSink(cfg.get('speakers.pactlDefaultSink'));
+      await pactl.setDefaultSink(cfg.get('pactl.defaultSink'));
     }
     return speakers;
   }

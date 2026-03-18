@@ -1,5 +1,7 @@
 import log from './logger.js';
+import config from 'config';
 import { spawn } from 'child_process';
+import EventEmitter from 'events';
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -10,8 +12,14 @@ import { spawn } from 'child_process';
  * e.g. "01:15:21:47:16:D4" → "bluez_output.01_15_21_47_16_D4.a2dp_sink"
  */
 const btSinkName = (address) =>
-  // `bluez_output.${address.replaceAll(':', '_')}.a2dp_sink`;
   `bluez_output.${address.replaceAll(':', '_')}.1`;
+
+/**
+ * Derive the PipeWire sink type from the sink name.
+ * e.g. "01:15:21:47:16:D4" → "bluez_output.01_15_21_47_16_D4.a2dp_sink"
+ */
+const sinkType = (name) =>
+  name.startsWith('bluez_output') ? 'bt' : 'speakers';
 
 /**
  * Run a pactl command, return { stdout, stderr, exitCode }.
@@ -44,9 +52,9 @@ const pactlRun = async (...args) => {
 const parseVolume = (raw) => {
   const pct = [...raw.matchAll(/(\d+)%/g)].map(m => m[1]);
   if (pct.length === 0) throw new Error(`Cannot parse volume from: ${raw}`);
-  const left  = pct[0] + '%';
+  const left = pct[0] + '%';
   const right = (pct[1] ?? pct[0]) + '%';
-  const avg   = Math.round((parseInt(pct[0]) + parseInt(pct[1] ?? pct[0])) / 2) + '%';
+  const avg = Math.round((parseInt(pct[0]) + parseInt(pct[1] ?? pct[0])) / 2) + '%';
   return { volumeLeft: left, volumeRight: right, volume: avg };
 };
 
@@ -70,7 +78,7 @@ const parseMute = (raw) => (raw.includes('yes') ? 'yes' : 'no');
 const volumeGet = async (sink = '@DEFAULT_SINK@') => {
   const [volRaw, muteRaw] = await Promise.all([
     pactlRun('get-sink-volume', sink),
-    pactlRun('get-sink-mute',   sink),
+    pactlRun('get-sink-mute', sink),
   ]);
   return { ...parseVolume(volRaw), mute: parseMute(muteRaw) };
 };
@@ -95,7 +103,7 @@ const volumeInc = async (channel = 'both', sink = '@DEFAULT_SINK@') => {
     const cur = await volumeGet(sink);
     const l = parseInt(cur.volumeLeft);
     const r = parseInt(cur.volumeRight);
-    const newL = channel === 'frontleft'  ? Math.min(100, l + 1) : l;
+    const newL = channel === 'frontleft' ? Math.min(100, l + 1) : l;
     const newR = channel === 'frontright' ? Math.min(100, r + 1) : r;
     await pactlRun('set-sink-volume', sink, `${newL}%`, `${newR}%`);
   }
@@ -112,7 +120,7 @@ const volumeDec = async (channel = 'both', sink = '@DEFAULT_SINK@') => {
     const cur = await volumeGet(sink);
     const l = parseInt(cur.volumeLeft);
     const r = parseInt(cur.volumeRight);
-    const newL = channel === 'frontleft'  ? Math.max(0, l - 1) : l;
+    const newL = channel === 'frontleft' ? Math.max(0, l - 1) : l;
     const newR = channel === 'frontright' ? Math.max(0, r - 1) : r;
     await pactlRun('set-sink-volume', sink, `${newL}%`, `${newR}%`);
   }
@@ -142,6 +150,126 @@ const setDefaultSink = async (sinkName) => {
   log.info(`default sink → ${sinkName}`);
 };
 
+const getDefaultSink = async () => {
+  const sinkName = (await pactlRun('get-default-sink')).trim();
+  const type = sinkName === config.get('pactl.defaultSink') ? 'speakers' : 'bt';
+  return { sinkName, type };
+};
+
+// ---------------------------------------------------------------------------
+// Event emitter — consumers (SSE route) subscribe to these
+// ---------------------------------------------------------------------------
+
+const PactlEvents = {
+  VOLUME_CHANGED: 'volume_changed',
+  DEFAULT_SINK_CHANGED: 'default_sink_changed',
+};
+
+class PactlService extends EventEmitter {
+
+  #watcherProc = null;
+  #restarting = true;
+
+  // -------------------------------------------------------------------------
+  // Watcher lifecycle
+  // -------------------------------------------------------------------------
+
+  startWatcher() {
+    if (this.#watcherProc) return;
+    this.#spawnWatcher();
+  }
+
+  stopWatcher() {
+    this.#restarting = false;
+    if (this.#watcherProc) {
+      this.#watcherProc.kill();
+      this.#watcherProc = null;
+    }
+  }
+
+  #spawnWatcher() {
+    const proc = spawn('pactl', ['subscribe']);
+    this.#watcherProc = proc;
+
+    let buf = '';
+
+    proc.stdout.on('data', (chunk) => {
+      buf += chunk.toString();
+      const lines = buf.split('\n');
+      buf = lines.pop();               // keep incomplete last line
+      for (const line of lines)
+        this.#handleSubscribeLine(line.trim());
+    });
+
+    proc.on('close', (code) => {
+      this.#watcherProc = null;
+      if (this.#restarting === false) return;
+      // unexpected exit — restart after a short delay
+      log.warn(`pactl subscribe exited (${code}), restarting in 3s`);
+      setTimeout(() => this.#spawnWatcher(), 3000);
+    });
+
+    this.#restarting = false;
+    log.info('pactl subscribe watcher started');
+  }
+
+  // -------------------------------------------------------------------------
+  // Line parser
+  // -------------------------------------------------------------------------
+
+  /**
+   * pactl subscribe emits lines like:
+   *   Event 'change' on sink #0
+   *   Event 'change' on server #0       ← default sink change
+   *   Event 'new' on sink-input #3
+   *
+   * We care about sink 'change' and server 'change' (which signals a
+   * default-sink switch and will also be followed by a sink 'change').
+   */
+  #volumeDebounceTimer = null;
+
+  async #handleSubscribeLine(line) {
+    if (!line) return;
+    console.log(`pactl event: ${line}`);
+
+    const isSinkChange = /Event 'change' on sink #/.test(line);
+    const isServerChange = /Event 'change' on server #/.test(line);
+
+    if (!isSinkChange && !isServerChange) return;
+
+    if (isServerChange) {
+      // no debounce needed — default sink changes are infrequent
+      try {
+        const sinkName = (await pactlRun('get-default-sink')).trim();
+        const defaultSink = {
+          sinkName: sinkName,
+          sinkType: sinkType(sinkName)
+        };
+        console.log(defaultSink.sinkType);
+        this.emit(PactlEvents.DEFAULT_SINK_CHANGED, defaultSink);
+        log.info(`default_sink_changed → ${JSON.stringify(defaultSink)}`);
+      } catch (err) {
+        log.error(`pactl watcher: failed to read default sink — ${err.message}`);
+      }
+      return;
+    }
+
+    // isSinkChange — debounce the volumeGet read
+    clearTimeout(this.#volumeDebounceTimer);
+    this.#volumeDebounceTimer = setTimeout(async () => {
+      try {
+        const vol = await volumeGet();
+        this.emit(PactlEvents.VOLUME_CHANGED, vol);
+        log.info(`volume_changed → ${JSON.stringify(vol)}`);
+      } catch (err) {
+        log.error(`pactl watcher: failed to read volume — ${err.message}`);
+      }
+    }, 300);
+  }
+}
+
+const pactlService = new PactlService();
+
 export default {
   btSinkName,
   volumeGet,
@@ -150,4 +278,10 @@ export default {
   volumeDec,
   volumeMute,
   setDefaultSink,
+  getDefaultSink,
+  startWatcher: () => pactlService.startWatcher(),
+  stopWatcher: () => pactlService.stopWatcher(),
 };
+
+// named export for SSE route to subscribe
+export { pactlService, PactlEvents };

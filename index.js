@@ -9,8 +9,8 @@ import bt from "./services/bt.js";
 import pactl from "./services/pactl.js";
 
 log.info(`${packageJSON.name} started`);
-log.info('Setting PipeWire default sink to: ' + config.get('speakers.pactlDefaultSink'));
-pactl.setDefaultSink(config.get('speakers.pactlDefaultSink'));
+pactl.startWatcher();
+// pactl.setDefaultSink(config.get('pactl.defaultSink'));
 cfgFile.init();
 bt.bluetoothctlStart();
 mpd.start();
@@ -19,8 +19,7 @@ mpd.start();
 process.on('SIGINT', async () => {
     httpd.closeAllConnections();
     httpd.close();
-    if (config.has('player.bt_output'))
-        mpd.output(['disableoutput', config.get('player.bt_output')]);
+    pactl.stopWatcher();
     await mpd.end();
     bt.bluetoothctlStop();
     log.info(`${packageJSON.name} ended`);

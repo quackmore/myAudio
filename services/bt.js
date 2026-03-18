@@ -23,39 +23,6 @@ const btWait = (ms) => new Promise((resolve, reject) => {
   btTimer = setTimeout(resolve, ms);
 });
 
-const volumeUpdate = async () => {
-  let BTdevice = bth.selectedCtrl.ConnectedDevice;
-  if (BTdevice == null) return;
-  BTdevice.volume = await pactl.volumeGet();
-}
-
-// const getBluealsaControls = async () => {
-//   let BTdevice = bth.selectedCtrl.ConnectedDevice;
-//   if (BTdevice == null) return;
-//   let bthCmd = spawn("amixer", ["-D", "bluealsa", "scontrols"]);
-//   let data = "";
-//   for await (const chunk of bthCmd.stdout)
-//     data += chunk;
-//   for (let line of data.toString().split('\n')) {
-//     if (line.toString().includes("A2DP")) {
-//       BTdevice.volCtrl = line.toString().split("'")[1];
-//       log.info(`found A2DP control ${BTdevice.volCtrl}`);
-//     }
-//   }
-//   let error = "";
-//   for await (const chunk of bthCmd.stderr) {
-//     error += chunk;
-//   }
-//   let exitCode = await new Promise((resolve, reject) => {
-//     bthCmd.on('close', resolve);
-//   });
-// 
-//   if (exitCode) {
-//     let msg = `<amixer -D bluealsa scontrols> got ${data} - ${error}`;
-//     log.error(msg);
-//   }
-// }
-
 const getBattery = async () => {
   let BTdevice = bth.selectedCtrl.ConnectedDevice;
   if (BTdevice == null) return;
@@ -100,193 +67,6 @@ const updateBattery = async () => {
       btUpdateBatteryTimer = setInterval(updateBattery, 60000);
   }
 }
-
-// const getBluealsaVolume = async () => {
-//   let BTdevice = bth.selectedCtrl.ConnectedDevice;
-//   if (BTdevice == null) return;
-//   if (BTdevice.volCtrl) {
-//     let volCtrl = `"${BTdevice.volCtrl}"`;
-//     let bthCmd = spawn("amixer", ["-D", "bluealsa", "sget", volCtrl]);
-//     let data = "";
-//     for await (const chunk of bthCmd.stdout)
-//       data += chunk;
-//     let volLevel = "";
-//     for (let line of data.toString().split('\n')) {
-//       let str = line.toString();
-//       if (str.length < 5) continue;
-//       if (str.includes('Front Left:')) {
-//         BTdevice.volumeLeft = str.match(/\[(.*?)\]/)[1];
-//         BTdevice.mute = str.match(/\[on\]/) ? "no" : "yes";
-//       }
-//       if (str.includes('Front Right:')) BTdevice.volumeRight = str.match(/\[(.*?)\]/)[1];
-//     }
-//     if (BTdevice.hasOwnProperty('volumeRight') && BTdevice.hasOwnProperty('volumeLeft')) {
-//       BTdevice.volume = ((Number(BTdevice.volumeLeft.slice(0, -1)) + Number(BTdevice.volumeRight.slice(0, -1))) / 2).toFixed(0).toString() + '%';
-//       log.info(`${BTdevice.Name} volume level ${BTdevice.volume}`);
-//       log.info(`${BTdevice.Name} ${BTdevice.mute == 'yes' ? 'is' : 'is not'} muted`);
-//     }
-//     let error = "";
-//     for await (const chunk of bthCmd.stderr) {
-//       error += chunk;
-//     }
-//     let exitCode = await new Promise((resolve, reject) => {
-//       bthCmd.on('close', resolve);
-//     });
-// 
-//     if (exitCode) {
-//       let msg = `<amixer -D bluealsa sget '${BTdevice.volCtrl}'> got ${data} - ${error}`;
-//       log.error(msg);
-//     }
-//   }
-// }
-// 
-// const amixerSset = async (ctrl, val) => {
-//   let bthCmd = spawn("amixer", ["-D", "bluealsa", "sset", ctrl, val]);
-//   let data = "";
-//   for await (const chunk of bthCmd.stdout)
-//     data += chunk;
-//   let error = "";
-//   for await (const chunk of bthCmd.stderr) {
-//     error += chunk;
-//   }
-//   let exitCode = await new Promise((resolve, reject) => {
-//     bthCmd.on('close', resolve);
-//   });
-// 
-//   if (exitCode) {
-//     let msg = `<amixer -D bluealsa sset ${ctrl} ${val}> got ${data} - ${error}`;
-//     log.error(msg);
-//   } else {
-//     log.info(`bluealsa volume set to ${val}`);
-//   }
-// }
-// 
-// const setBluealsaVolume = async (fl, fr) => {
-//   let BTdevice = bth.selectedCtrl.ConnectedDevice;
-//   if (BTdevice == null) return;
-//   if (BTdevice.volCtrl) {
-//     let volCtrlStr = `"${BTdevice.volCtrl}"`;
-//     let volValue;
-//     if (fr) {
-//       volValue = `frontleft ${fl}`;
-//       await amixerSset(volCtrlStr, volValue);
-//       volValue = `frontright ${fr}`;
-//       await amixerSset(volCtrlStr, volValue);
-//     } else {
-//       volValue = fl;
-//       await amixerSset(volCtrlStr, volValue);
-//     }
-//   }
-// }
-// 
-const saveBTVolume = async () => {
-  let BTdevice = bth.selectedCtrl.ConnectedDevice;
-  if (BTdevice == null) return;
-  if (!BTdevice.hasOwnProperty('volume')) return;
-  let content = await cfgfile.read();
-  if (!content.hasOwnProperty('bt')) content.bt = {};
-  if (!content.bt.hasOwnProperty('defaultVolume')) content.bt.defaultVolume = [];
-  let devFound = false;
-  for (let dev of content.bt.defaultVolume)
-    if (dev.address === BTdevice.Address) {
-      devFound = true;
-      dev.volumeRight = BTdevice.volumeRight;
-      dev.volumeLeft = BTdevice.volumeLeft;
-    }
-  if (!devFound)
-    content.bt.defaultVolume.push({ 'address': BTdevice.Address, 'volumeRight': BTdevice.volumeRight, 'volumeLeft': BTdevice.volumeLeft });
-  cfgfile.save(content);
-}
-
-// const volumeInc = async (balance) => {
-//   let BTdevice = bth.selectedCtrl.ConnectedDevice;
-//   if (BTdevice == null) return;
-//   if (BTdevice.volCtrl) {
-//     // set playback volume
-//     if (BTdevice.volume != "100%") {
-//       let volCtrlStr = `"${BTdevice.volCtrl}"`;
-//       let balance_option = '';
-//       if (balance == 'frontleft' || balance == 'frontright') balance_option = `${balance} `;
-//       let volValue = `${balance_option}1%+`;
-//       await amixerSset(volCtrlStr, volValue);
-//       await getBluealsaVolume();
-//       saveBTVolume();
-//     }
-//   }
-// }
-// 
-// const volumeDec = async (balance) => {
-//   let BTdevice = bth.selectedCtrl.ConnectedDevice;
-//   if (BTdevice == null) return;
-//   if (BTdevice.volCtrl) {
-//     // set playback volume
-//     if (BTdevice.volume != "0%") {
-//       let volCtrlStr = `"${BTdevice.volCtrl}"`;
-//       let balance_option = '';
-//       if (balance == 'frontleft' || balance == 'frontright') balance_option = `${balance} `;
-//       let volValue = `${balance_option}1%-`;
-//       await amixerSset(volCtrlStr, volValue);
-//       await getBluealsaVolume();
-//       saveBTVolume();
-//     }
-//   }
-// }
-// 
-// const volumeMute = async (val) => {
-//   // val = "mute" || "unmute"
-//   if (val !== "mute" && val !== "unmute") {
-//     // reject(`invalid command ${val}`);
-//     return;
-//   }
-//   let BTdevice = bth.selectedCtrl.ConnectedDevice;
-//   if (BTdevice == null) return;
-//   if (BTdevice.volCtrl) {
-//     if (BTdevice.volume != "0%") {
-//       let volCtrlStr = `"${BTdevice.volCtrl}"`;
-//       await amixerSset(volCtrlStr, val);
-//       await getBluealsaVolume();
-//     }
-//   }
-// }
-// 
-// const volumeSet = async (value) => {
-//   let BTdevice = bth.selectedCtrl.ConnectedDevice;
-//   if (BTdevice == null) return;
-//   if (BTdevice.volCtrl) {
-//     // try max 40 times
-//     for (let idx = 0; idx < 40; idx++) {
-//       await setBluealsaVolume(value);
-//       await btWait(1000);
-//       await getBluealsaVolume();
-//       if (BTdevice.volume === value) break;
-//     }
-//     await saveBTVolume();
-//   }
-// }
-
-// const setDefaultVolume = async (address) => {
-//   let content = await cfgfile.read();
-//   if (content.bt.hasOwnProperty('defaultVolume')) {
-//     for (let dev of content.bt.defaultVolume)
-//       if (dev.address === address) {
-//         log.info('setting bluealsa default value...');
-//         let BTdevice = bth.selectedCtrl.ConnectedDevice;
-//         if (BTdevice == null) return;
-//         if (BTdevice.volCtrl) {
-//           // try max 40 times
-//           for (let idx = 0; idx < 40; idx++) {
-//             await setBluealsaVolume(dev.volumeLeft, dev.volumeRight);
-//             await btWait(1000);
-//             await getBluealsaVolume();
-//             if (BTdevice.volumeLeft === dev.volumeLeft && BTdevice.volumeRight === dev.volumeRight) break;
-//           }
-//         }
-//         // await volumeSet(dev.volumeLeft, dev.volumeRight);
-//         return;
-//       }
-//   }
-//   log.info(`no default volume for device ${address}`);
-// }
 
 const saveLastDeviceConnected = async (address) => {
   let content = await cfgfile.read();
@@ -478,9 +258,6 @@ const parseBluetoothctl = (data) => {
   // console.log(bth);
 }
 
-// log.info("starting bluetoothctl...")
-// var bluetoothctl = spawn('bluetoothctl');
-
 var bluetoothctl = null;
 
 const bluetoothctlInput = (cmd) => {
@@ -579,34 +356,13 @@ btEvent.on(events.BT_POWEROFF, () => {
 
 btEvent.on(events.DEV_CONNECTED, async address => {
   log.info(`device ${address} connected`);
-  // await parseBluetoothctl.volumeGet();
   await saveLastDeviceConnected(address);
   let BTdevice = bth.selectedCtrl.ConnectedDevice;
-  BTdevice.volume = null;
-  await btWait(3000);
+  await btWait(5000);
   await pactl.setDefaultSink(pactl.btSinkName(address));
-  BTdevice.volume = await pactl.volumeGet();
-  log.info(`current volume is ${JSON.stringify(BTdevice.volume)}`);
   btEvent.emit(events.DEV_AVAILABLE, address);
   controllerScanOff();
   await updateBattery();
-  // let cnt = 0;
-  // while (!bth.selectedCtrl.ConnectedDevice.hasOwnProperty('volCtrl')) {
-  //   await btWait(1000);
-  //   log.info('inspecting bluealsa controls...');
-  //   await getBluealsaControls(address);
-  //   cnt++;
-  //   if (cnt > 30) break;
-  // }
-  // if (cnt < 30) {
-  //   await getBluealsaVolume();
-  //   await saveLastDeviceConnected(address);
-  //   await setDefaultVolume(address);
-  //   btEvent.emit(events.DEV_AVAILABLE, address);
-  //   controllerScanOff();
-  // } else {
-  //   log.error("didn't find any bluealsa controls");
-  // }
 })
 
 btEvent.on(events.DEV_AVAILABLE, async address => {
@@ -617,9 +373,6 @@ btEvent.on(events.DEV_DISCONNECTED, async address => {
   log.info(`device ${address} disconnected`);
   let dev = bth.devices.find(item => item.Address == address);
   if (dev.battery) delete dev.battery;
-  // if (dev.volCtrl) delete dev.volCtrl;
-  if (dev.volume) delete dev.volume;
-  // if (dev.mute) delete dev.mute;
   clearInterval(btUpdateBatteryTimer);
   btUpdateBatteryTimer = null;
   await btWait(200);
@@ -634,10 +387,5 @@ export default {
   events: events,
   status: () => bth,
   getLog: () => bthLog,
-  volumeUpdate: volumeUpdate,
-  // volumeSet: volumeSet,
-  // volumeInc: volumeInc,
-  // volumeDec: volumeDec,
-  // volumeMute: volumeMute,
   btReset: bluetoothctlStart
 };
