@@ -334,10 +334,10 @@
     const updateSpeakers = async () => {
       if (!player.speakers) return;
       document.getElementById('outputSwitch').innerHTML = (player.speakers.speakerOn === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
-      document.getElementById('volRange').value = player.speakers.volume.split("%")[0];
-      document.getElementById('volRange').disabled = false;
-      document.getElementById('volLevel').innerText = player.speakers.volume.split("%")[0];
-      document.getElementById('volMute').innerHTML = player.speakers.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
+      // document.getElementById('volRange').value = player.speakers.volume.split("%")[0];
+      // document.getElementById('volRange').disabled = false;
+      // document.getElementById('volLevel').innerText = player.speakers.volume.split("%")[0];
+      // document.getElementById('volMute').innerHTML = player.speakers.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
       closeBtDevMod();
     }
 
@@ -633,24 +633,24 @@
     }
 
     const updateBTvolume = () => {
-      if (player.bt.selectedCtrl.ConnectedDevice) {
-        let connected = player.bt.selectedCtrl.ConnectedDevice;
-        if (connected.volume) {
-          document.getElementById('volRange').value = connected.volume.volume.split("%")[0];
-          document.getElementById('volLevel').innerText = connected.volume.volume.split("%")[0];
-          document.getElementById('volLeft').innerText = connected.volume.volumeLeft.split("%")[0];
-          document.getElementById('volRight').innerText = connected.volume.volumeRight.split("%")[0];
-          document.getElementById('volRange').disabled = false;
-          document.getElementById('volMute').innerHTML = connected.volume.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
-        }
-      } else {
-        document.getElementById('volRange').value = 0;
-        document.getElementById('volRange').disabled = true;
-        document.getElementById('volLevel').innerText = 0;
-        document.getElementById('volLeft').innerText = 0;
-        document.getElementById('volRight').innerText = 0;
-        document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark actC"></i>';
-      }
+      //  if (player.bt.selectedCtrl.ConnectedDevice) {
+      //    let connected = player.bt.selectedCtrl.ConnectedDevice;
+      //    if (connected.volume) {
+      //      document.getElementById('volRange').value = connected.volume.volume.split("%")[0];
+      //      document.getElementById('volLevel').innerText = connected.volume.volume.split("%")[0];
+      //      document.getElementById('volLeft').innerText = connected.volume.volumeLeft.split("%")[0];
+      //      document.getElementById('volRight').innerText = connected.volume.volumeRight.split("%")[0];
+      //      document.getElementById('volRange').disabled = false;
+      //      document.getElementById('volMute').innerHTML = connected.volume.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
+      //    }
+      //  } else {
+      //    document.getElementById('volRange').value = 0;
+      //    document.getElementById('volRange').disabled = true;
+      //    document.getElementById('volLevel').innerText = 0;
+      //    document.getElementById('volLeft').innerText = 0;
+      //    document.getElementById('volRight').innerText = 0;
+      //    document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark actC"></i>';
+      //  }
     }
 
     let prevCtrl = {
@@ -703,6 +703,17 @@
     }
 
     // VOLUME
+
+    const updateVolume = (vol) => {
+      document.getElementById('volRange').value = vol.volume.split('%')[0];
+      document.getElementById('volRange').disabled = false;
+      document.getElementById('volLevel').innerText = vol.volume.split('%')[0];
+      document.getElementById('volLeft').innerText = vol.volumeLeft.split('%')[0];
+      document.getElementById('volRight').innerText = vol.volumeRight.split('%')[0];
+      document.getElementById('volMute').innerHTML = vol.mute === 'yes'
+        ? '<i class="fa-solid fa-volume-xmark actC"></i>'
+        : '<i class="fa-solid fa-volume-high actC"></i>';
+    };
 
     const volumeSet = async () => {
       let vol = document.getElementById('volRange').value;
@@ -1621,7 +1632,44 @@
       });
     }
 
+    const initSSE = () => {
+      const es = new EventSource('/events');
+
+      es.onmessage = (e) => {
+        const event = JSON.parse(e.data);
+        switch (event.type) {
+          case 'volume_changed':
+            updateVolume(event.data);
+            break;
+          case 'default_sink_changed':
+            setOutput(event.data.type === 'speakers' ? 'Speakers' : 'Bluetooth');
+            break;
+          case 'connected':
+            console.log('SSE connected');
+            getPactlStatus();
+            break;
+        }
+      };
+
+      es.onerror = (e) => {
+        // EventSource reconnects automatically — no action needed
+        // but worth logging for debugging
+        console.warn('SSE connection lost, browser will retry');
+      };
+
+      return es;
+    };
+
     // STARTUP
+    const getPactlStatus = async () => {
+      return toutFetch('/pactl/status', 5000)
+        .then(res => res.json())
+        .then(data => {
+          setOutput(data.type === 'speakers' ? 'Speakers' : 'Bluetooth');
+          updateVolume(data);
+        });
+    };
+
     async function startup() {
       loadSpinner();
       let output = 'Speakers';
@@ -1629,7 +1677,8 @@
       cfg = await readCfg();
       if (cfg.output)
         output = cfg.output;
-      setOutput(output);
+      initSSE();
+      await getPactlStatus();
       await getSpeakerStatus();
       await getBtStatus();
       if (getOutput() === 'Speakers')

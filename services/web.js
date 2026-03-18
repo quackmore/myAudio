@@ -10,6 +10,7 @@ import pactlRouter from '../routes/pactl.route.js';
 import podcastRouter from '../routes/podcast.route.js';
 import speakersRouter from '../routes/speakers.route.js';
 import streamRouter from '../routes/stream.route.js';
+import sseEvents from '../routes/sse-events.route.js';
 
 const web = express();
 
@@ -31,5 +32,6 @@ web.use('/pactl', pactlRouter);
 web.use('/podcast', podcastRouter);
 web.use('/speakers', speakersRouter);
 web.use('/stream', streamRouter);
+web.use('/events', sseEvents);
 
 export default web;
