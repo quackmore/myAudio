@@ -29,6 +29,54 @@ router.get('/', (req, res) => {
   };
 
   /**
+   * Bluetooth Event Handlers
+   */
+
+  const onControllerPoweredOn = ({ address }) => {
+    sendEvent('bt_controller_powered_on', { address });
+  };
+
+  const onControllerPoweredOff = ({ address }) => {
+    sendEvent('bt_controller_powered_off', { address });
+  };
+
+  const onDeviceFound = (device) => {
+    sendEvent('bt_device_found', device);
+  };
+
+  const onDeviceConnected = (device) => {
+    sendEvent('bt_device_connected', device);
+  };
+
+  const onDeviceDisconnected = ({ address }) => {
+    sendEvent('bt_device_disconnected', { address });
+  };
+
+  const onDeviceRemoved = ({ address }) => {
+    sendEvent('bt_device_removed', { address });
+  };
+
+  const onBatteryChanged = ({ address, battery }) => {
+    sendEvent('bt_battery_changed', { address, battery });
+  };
+
+  const onDeviceNameChanged = ({ address, name }) => {
+    sendEvent('bt_device_name_changed', { address, name });
+  };
+
+  /**
+  * Subscribe to Bluetooth events
+  */
+  btService.on(BtEvents.CONTROLLER_POWERED_ON, onControllerPoweredOn);
+  btService.on(BtEvents.CONTROLLER_POWERED_OFF, onControllerPoweredOff);
+  btService.on(BtEvents.DEVICE_FOUND, onDeviceFound);
+  btService.on(BtEvents.DEVICE_CONNECTED, onDeviceConnected);
+  btService.on(BtEvents.DEVICE_DISCONNECTED, onDeviceDisconnected);
+  btService.on(BtEvents.DEVICE_REMOVED, onDeviceRemoved);
+  btService.on(BtEvents.DEVICE_BATTERY_CHANGED, onBatteryChanged);
+  btService.on(BtEvents.DEVICE_NAME_CHANGED, onDeviceNameChanged);
+
+  /**
    * Pactl Handlers
    */
   const onVolumeChanged = (vol) => {
@@ -40,64 +88,8 @@ router.get('/', (req, res) => {
   };
 
   /**
-   * Bluetooth Event Handlers
-   */
-
-  //  const onControllerPoweredOn = ({ address }) => {
-  //    sendEvent('bt_controller_powered_on', { address });
-  //  };
-  //
-  //  const onControllerPoweredOff = ({ address }) => {
-  //    sendEvent('bt_controller_powered_off', { address });
-  //  };
-  //
-  //  const onDeviceFound = (device) => {
-  //    sendEvent('bt_device_found', device);
-  //  };
-  //
-  //  const onDeviceConnected = (device) => {
-  //    sendEvent('bt_device_connected', device);
-  //  };
-  //
-  //  const onDeviceDisconnected = ({ address }) => {
-  //    sendEvent('bt_device_disconnected', { address });
-  //  };
-  //
-  //  const onDeviceRemoved = ({ address }) => {
-  //    sendEvent('bt_device_removed', { address });
-  //  };
-  //
-  //  const onBatteryChanged = ({ address, battery }) => {
-  //    sendEvent('bt_battery_changed', { address, battery });
-  //  };
-  //
-  //  const onVolumeChanged = ({ address, volume, volumeLeft, volumeRight, mute }) => {
-  //    sendEvent('bt_volume_changed', {
-  //      address,
-  //      volume,
-  //      volumeLeft,
-  //      volumeRight,
-  //      mute
-  //    });
-  //  };
-  //
-  //   const onDeviceNameChanged = ({ address, name }) => {
-  //     sendEvent('bt_device_name_changed', { address, name });
-  //   };
-
-  /**
-   * Subscribe to Bluetooth events
-   */
-  //   btService.on(BtEvents.CONTROLLER_POWERED_ON, onControllerPoweredOn);
-  //   btService.on(BtEvents.CONTROLLER_POWERED_OFF, onControllerPoweredOff);
-  //   btService.on(BtEvents.DEVICE_FOUND, onDeviceFound);
-  //   btService.on(BtEvents.DEVICE_CONNECTED, onDeviceConnected);
-  //   btService.on(BtEvents.DEVICE_DISCONNECTED, onDeviceDisconnected);
-  //   btService.on(BtEvents.DEVICE_REMOVED, onDeviceRemoved);
-  //   btService.on(BtEvents.DEVICE_BATTERY_CHANGED, onBatteryChanged);
-  //   btService.on(BtEvents.DEVICE_VOLUME_CHANGED, onVolumeChanged);
-  //   btService.on(BtEvents.DEVICE_NAME_CHANGED, onDeviceNameChanged);
-
+  * Subscribe to Pactl events
+  */
   pactlService.on(PactlEvents.VOLUME_CHANGED, onVolumeChanged);
   pactlService.on(PactlEvents.DEFAULT_SINK_CHANGED, onDefaultSinkChanged);
 
@@ -129,15 +121,14 @@ router.get('/', (req, res) => {
     log.info('SSE client disconnected');
 
     // Unsubscribe from all Bluetooth events
-    // btService.off(BtEvents.CONTROLLER_POWERED_ON, onControllerPoweredOn);
-    // btService.off(BtEvents.CONTROLLER_POWERED_OFF, onControllerPoweredOff);
-    // btService.off(BtEvents.DEVICE_FOUND, onDeviceFound);
-    // btService.off(BtEvents.DEVICE_CONNECTED, onDeviceConnected);
-    // btService.off(BtEvents.DEVICE_DISCONNECTED, onDeviceDisconnected);
-    // btService.off(BtEvents.DEVICE_REMOVED, onDeviceRemoved);
-    // btService.off(BtEvents.DEVICE_BATTERY_CHANGED, onBatteryChanged);
-    // btService.off(BtEvents.DEVICE_VOLUME_CHANGED, onVolumeChanged);
-    // btService.off(BtEvents.DEVICE_NAME_CHANGED, onDeviceNameChanged);
+    btService.off(BtEvents.CONTROLLER_POWERED_ON, onControllerPoweredOn);
+    btService.off(BtEvents.CONTROLLER_POWERED_OFF, onControllerPoweredOff);
+    btService.off(BtEvents.DEVICE_FOUND, onDeviceFound);
+    btService.off(BtEvents.DEVICE_CONNECTED, onDeviceConnected);
+    btService.off(BtEvents.DEVICE_DISCONNECTED, onDeviceDisconnected);
+    btService.off(BtEvents.DEVICE_REMOVED, onDeviceRemoved);
+    btService.off(BtEvents.DEVICE_BATTERY_CHANGED, onBatteryChanged);
+    btService.off(BtEvents.DEVICE_NAME_CHANGED, onDeviceNameChanged);
 
     // TODO: Unsubscribe from MPD events
     // mpdService.off(MpdEvents.SONG_CHANGED, onMpdSongChanged);
