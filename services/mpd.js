@@ -4,7 +4,7 @@ const cmd = mpd.cmd;
 import log from './logger.js';
 import { spawn } from "child_process";
 import cfg from 'config';
-import bt from './bt.js';
+import { btService, btEvents } from './bt.js';
 import fs from 'fs';
 
 var mpdSt = {};
@@ -257,7 +257,7 @@ async function restart() {
     log.info("mpd restarted");
 }
 
-bt.event.on(bt.events.DEV_CONNECTED, async address => {
+btService.on(btEvents.DEVICE_CONNECTED, async address => {
   // await updateAlsaBtCfg(address);
 //   if (cfg.has('player.bt_output')) {
 //     log.info(`enabling mpd output ${cfg.get('player.bt_output')}`);
@@ -269,7 +269,7 @@ bt.event.on(bt.events.DEV_CONNECTED, async address => {
 //  }
 })
 
-bt.event.on(bt.events.DEV_DISCONNECTED, async address => {
+btService.on(btEvents.DEVICE_DISCONNECTED, async address => {
 //  if (cfg.has('player.bt_output')) {
 //    log.info(`disabling mpd output ${cfg.get('player.bt_output')}`);
 //    await output(['disableoutput', cfg.get('player.bt_output')]);

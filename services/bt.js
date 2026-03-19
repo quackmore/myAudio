@@ -2,390 +2,436 @@ import log from './logger.js';
 import cfgfile from './cfgfile.js';
 import stripAnsi from 'strip-ansi';
 import EventEmitter from 'events';
-import { spawn } from "child_process";
-import cfg from 'config';
-import pactl from './pactl.js';
+import { spawn } from 'child_process';
 
-var bth = null;
+// ---------------------------------------------------------------------------
+// Public event constants
+// ---------------------------------------------------------------------------
 
-const bthLogMaxLen = 100;
-var bthLog = [];
-
-const bthLogger = (line) => {
-  if (bthLog.length == bthLogMaxLen) bthLog.shift();
-  bthLog.push(line);
-}
-
-var btTimer = null;
-var btUpdateBatteryTimer = null;
-
-const btWait = (ms) => new Promise((resolve, reject) => {
-  btTimer = setTimeout(resolve, ms);
-});
-
-const getBattery = async () => {
-  let BTdevice = bth.selectedCtrl.ConnectedDevice;
-  if (BTdevice == null) return;
-  BTdevice.battery = '--';
-  if (!cfg.has('player.bt_battery')) return;
-  let bthCmd = spawn("python3", [`${cfg.get('player.bt_battery')}`, `${BTdevice.Address}`]);
-  let data = "";
-  for await (const chunk of bthCmd.stdout)
-    data += chunk;
-  for (let line of data.toString().split('\n')) {
-    if (line.toString().includes("Battery level")) {
-      BTdevice.battery = line.toString().split(":")[1];
-      log.info(`Battery level: ${BTdevice.battery}`);
-    }
-    if (line.toString().includes("Address")) {
-      let addr = line.toString().slice(line.toString().indexOf(':') + 1);
-      log.info(`Querying ${addr} for battery level`);
-    }
-    if (line.toString().includes("Port")) {
-      let port = line.toString().split(":")[1];
-      log.info(`${BTdevice.Address} replied on port ${port}`);
-    }
-  }
-  let error = "";
-  for await (const chunk of bthCmd.stderr) {
-    error += chunk;
-  }
-  let exitCode = await new Promise((resolve, reject) => {
-    bthCmd.on('close', resolve);
-  });
-
-  if (exitCode) {
-    let msg = `<python3 ${cfg.get(player.bt_battery)} ${BTdevice.Address}> got ${data} - ${error}`;
-    log.error(msg);
-  }
-}
-
-const updateBattery = async () => {
-  if (bth.selectedCtrl.ConnectedDevice) {
-    await getBattery();
-    if (btUpdateBatteryTimer == null)
-      btUpdateBatteryTimer = setInterval(updateBattery, 60000);
-  }
-}
-
-const saveLastDeviceConnected = async (address) => {
-  let content = await cfgfile.read();
-  if (!content.hasOwnProperty('bt')) content.bt = {};
-  if (content.bt.hasOwnProperty('lastConnected') && content.bt.lastConnected === address) {
-    log.info(`last connected device is up to date`);
-  } else {
-    content.bt.lastConnected = address;
-    cfgfile.save(content);
-    log.info(`last connected device updated to ${address} `);
-  }
-}
-
-const btEvent = new EventEmitter();
-
-const events = {
-  BT_START: "BT_START",
-  BT_END: "BT_END",
-  BT_POWERON: "BT_POWERON",
-  BT_POWEROFF: "BT_POWEROFF",
-  DEV_CONNECTED: "DEV_CONNECTED",
-  DEV_DISCONNECTED: "DEV_DISCONNECTED",
-  DEV_AVAILABLE: "DEV_AVAILABLE"
+const btEvents = {
+  CONTROLLER_POWERED_ON:  'controller_powered_on',   // { address }
+  CONTROLLER_POWERED_OFF: 'controller_powered_off',  // { address }
+  DEVICE_FOUND:           'device_found',             // { address, name }
+  DEVICE_CONNECTED:       'device_connected',         // { address, name }
+  DEVICE_DISCONNECTED:    'device_disconnected',      // { address }
+  DEVICE_REMOVED:         'device_removed',           // { address }
+  DEVICE_BATTERY_CHANGED: 'device_battery_changed',  // { address, battery }
 };
 
-const isControllerListed = (addr) => bth.controllers.map(item => item.Address).includes(addr);
+// ---------------------------------------------------------------------------
+// BtService
+// ---------------------------------------------------------------------------
 
-var lastCtrlAddress = null;
+class BtService extends EventEmitter {
 
-const controllerUpdate = (line) => {
-  // console.log('controllerUpdate: ' + line);
-  if (line.startsWith("Controller")) {
-    let splittedLine = line.split(' ');
-    lastCtrlAddress = splittedLine[1];
-    if (!isControllerListed(lastCtrlAddress)) {
-      bth.controllers.push({ Address: lastCtrlAddress, ConnectedDevice: null });
+  // ── private state ─────────────────────────────────────────────────────────
+
+  #proc             = null;   // bluetoothctl child process
+  #restarting       = false;  // false = intentional stop
+  #logBuffer        = [];     // rolling log ring
+  #logMaxLen        = 100;
+
+  // parsed BT world
+  #controllers      = [];     // [{ Address, Name, Powered, Pairable, Discoverable, Discovering }]
+  #selectedCtrl     = null;   // reference into #controllers
+  #devices          = [];     // [{ Address, Name, Icon, Paired, Trusted, Connected, battery? }]
+
+  // per-session parsing context
+  #pendingCommand   = null;   // command whose response we are currently reading
+  #lastCtrlAddress  = null;   // address context for multi-line controller output
+  #lastDevAddress   = null;   // address context for multi-line device output
+
+  // timers (reserved for future use)
+
+  // ── public lifecycle ──────────────────────────────────────────────────────
+
+  start() {
+    if (this.#proc) this.stop();
+    this.#restarting = true;
+    this.#spawn();
+  }
+
+  stop() {
+    this.#restarting = false;
+    if (this.#proc) {
+      this.#proc.kill('SIGINT');
+      this.#proc = null;
     }
-    if (line.includes("[default]"))
-      bth.selectedCtrl = bth.controllers.find(item => item.Address == lastCtrlAddress);
   }
-  let ctrl = bth.controllers.find(item => item.Address == lastCtrlAddress);
-  if (ctrl) {
-    if (line.includes("Name"))
-      ctrl.Name = line.split(': ')[1];
-    if (line.includes("Powered")) {
-      let lastPowered = ctrl.Powered;
-      ctrl.Powered = line.split(': ')[1];
-      if (ctrl.Powered == 'yes' && (!lastPowered || lastPowered == 'no'))
-        btEvent.emit(events.BT_POWERON, ctrl.Address);
-      if (ctrl.Powered == 'no' && lastPowered && lastPowered == 'yes')
-        btEvent.emit(events.BT_POWEROFF, ctrl.Address);
+
+  /** Send a raw command string to bluetoothctl stdin. */
+  cmd(command) {
+    log.info(`bluetoothctl ← ${command}`);
+    if (this.#proc) this.#proc.stdin.write(command + '\n');
+    // after a power toggle, refresh controller state
+    if (command.includes('power')) {
+      setTimeout(() => this.#sendCmd('show'), 2000);
     }
-    if (line.includes("Pairable"))
-      ctrl.Pairable = line.split(': ')[1];
-    if (line.includes("Discovering"))
-      ctrl.Discovering = line.split(': ')[1];
-    if (line.includes("Discoverable:"))
-      ctrl.Discoverable = line.split(': ')[1];
   }
-}
 
-var lastDevAddress = null;
-
-const deviceUpdate = (line) => {
-  // console.log('deviceUpdate: ' + line);
-  if (line.startsWith("Device")) {
-    let splittedLine = line.split(' ');
-    lastDevAddress = splittedLine[1];
+  /** Reset by restarting the bluetoothctl process. */
+  reset() {
+    this.start();
   }
-  let dev = bth.devices.find(item => item.Address == lastDevAddress);
-  if (dev) {
-    if (line.includes("Name") && !line.includes("is nil"))
-      dev.Name = line.split(': ')[1];
-    if (line.includes("Icon"))
-      dev.Icon = line.split(': ')[1];
-    if (line.includes("Blocked"))
-      dev.Blocked = line.split(': ')[1];
-    if (line.includes("Paired"))
-      dev.Paired = line.split(': ')[1];
-    if (line.includes("Trusted"))
-      dev.Trusted = line.split(': ')[1];
-    if (line.includes("Connected")) {
-      dev.Connected = line.split(': ')[1];
-      if (dev.Connected === 'yes') {
-        bth.selectedCtrl.ConnectedDevice = dev;
-        btEvent.emit(events.DEV_CONNECTED, dev.Address);
+
+  /** Snapshot of current BT state (used by /bt/status route). */
+  status() {
+    return {
+      controllers:  this.#controllers,
+      selectedCtrl: this.#selectedCtrl,
+      devices:      this.#devices,
+    };
+  }
+
+  /** Rolling log (used by /bt/log route). */
+  getLog() {
+    return [...this.#logBuffer];
+  }
+
+  // ── private: process management ───────────────────────────────────────────
+
+  #spawn() {
+    const proc = spawn('bluetoothctl');
+    this.#proc = proc;
+
+    // reset world state for a fresh session
+    this.#controllers    = [];
+    this.#selectedCtrl   = null;
+    this.#devices        = [];
+    this.#pendingCommand = null;
+    this.#lastCtrlAddress = null;
+    this.#lastDevAddress  = null;
+
+    proc.stdout.on('data', (data) => {
+      const cleaned = stripAnsi(data.toString()).replace(/\u0001|\u0002/g, '');
+      for (const line of cleaned.split(/\n|\r/)) {
+        const trimmed = line.trim();
+        if (trimmed) this.#parseLine(trimmed);
       }
-      if (dev.Connected === 'no' && bth.selectedCtrl.ConnectedDevice && bth.selectedCtrl.ConnectedDevice.Address == dev.Address) {
-        bth.selectedCtrl.ConnectedDevice = null;
-        btEvent.emit(events.DEV_DISCONNECTED, dev.Address);
+    });
+
+    proc.stderr.on('data', (data) => {
+      log.warn(`bluetoothctl stderr: ${data.toString().trim()}`);
+    });
+
+    proc.on('close', (code) => {
+      this.#proc = null;
+      if (!this.#restarting) return;
+      log.warn(`bluetoothctl exited (${code}), restarting in 2s`);
+      setTimeout(() => this.#spawn(), 2000);
+    });
+
+    log.info('bluetoothctl started');
+    this.#init();
+  }
+
+  /** Initial interrogation sequence after process start. */
+  async #init() {
+    await this.#sleep(500);
+    this.#sendCmd('list');
+    await this.#sleep(800);
+    if (this.#selectedCtrl) {
+      this.#sendCmd(`show ${this.#selectedCtrl.Address}`);
+    }
+    await this.#sleep(800);
+    this.#sendCmd('devices');
+    await this.#sleep(800);
+    // query info for each already-known device
+    for (const dev of [...this.#devices]) {
+      this.#sendCmd(`info ${dev.Address}`);
+      await this.#sleep(600);
+    }
+    // if powered on, start scanning
+    if (this.#selectedCtrl?.Powered === 'yes') {
+      this.#scanOn();
+    }
+  }
+
+  /** Internal cmd helper — does not trigger the power-refresh side effect. */
+  #sendCmd(command) {
+    this.#pendingCommand = command.split(' ')[0]; // e.g. 'show', 'devices', 'info'
+    if (this.#proc) this.#proc.stdin.write(command + '\n');
+  }
+
+  // ── private: line parser ──────────────────────────────────────────────────
+
+  #parseLine(line) {
+    this.#log(line);
+
+    // ── async event lines ──────────────────────────────────────────────────
+    if (line.startsWith('[NEW]'))    { this.#handleNew(line);    return; }
+    if (line.startsWith('[CHG]'))    { this.#handleChg(line);    return; }
+    if (line.startsWith('[DEL]'))    { this.#handleDel(line);    return; }
+
+    // ── command echo lines — set parsing context ───────────────────────────
+    // bluetoothctl echoes the command back before its response
+    const cmdEchoes = ['list', 'show', 'select', 'devices', 'info'];
+    for (const kw of cmdEchoes) {
+      if (line.startsWith(kw)) {
+        this.#pendingCommand = kw;
+        return;
       }
     }
-    if (line.includes("RSSI"))
-      dev.RSSI = line.split(': ')[1];
-  }
-}
 
-const isDeviceListed = (addr) => bth.devices.map(item => item.Address).includes(addr);
+    // ── response lines — route to appropriate handler ─────────────────────
+    if (!this.#pendingCommand) return;
 
-const devicesCmd = (line) => {
-  // console.log('devicesCmd: ' + line);
-  if (!line.includes("Device")) return;
-  let address = line.split(' ')[1];
-  if (!isDeviceListed(address)) {
-    bth.devices.push({ "Address": address, "Name": line.split(' ').slice(2).join(' ') });
-  }
-}
-
-const infoCmd = (line) => {
-  // console.log('infoCmd: ' + line);
-  deviceUpdate(line);
-}
-
-const newBtDevice = async (line) => {
-  // console.log('newBtDevice: ' + line);
-  if (line.includes("Device")) {
-    let address = line.split(' ')[2];
-    if (!isDeviceListed(address)) {
-      bth.devices.push({ "Address": address });
-      await btWait(500);
-      bluetoothctlInput(`info ${address}`);
+    switch (this.#pendingCommand) {
+      case 'list':
+      case 'show':
+      case 'select':
+        this.#applyControllerLine(line);
+        break;
+      case 'devices':
+        this.#applyDevicesLine(line);
+        break;
+      case 'info':
+        this.#applyDeviceLine(line);
+        break;
     }
   }
-}
 
-const updateBtDevice = async (line) => {
-  // console.log('updateBtDevice: ' + line);
-  if (line.includes("Controller")) {
-    lastCtrlAddress = await line.split(' ')[2];
-    controllerUpdate(line.split(' ').slice(3).join(' '));
-  } else if (line.includes("Device")) {
-    lastDevAddress = line.split(' ')[2];
-    deviceUpdate(line.split(' ').slice(3).join(' '));
+  // ── private: [NEW] / [CHG] / [DEL] handlers ──────────────────────────────
+
+  #handleNew(line) {
+    // [NEW] Device AA:BB:CC:DD:EE:FF Friendly Name
+    if (!line.includes('Device')) return;
+    const parts = line.split(' ');
+    const address = parts[2];
+    const name    = parts.slice(3).join(' ');
+    if (!this.#deviceByAddress(address)) {
+      this.#devices.push({ Address: address, Name: name });
+      log.info(`device found: ${address} (${name})`);
+      this.emit(btEvents.DEVICE_FOUND, { address, name });
+      // fetch full info shortly after
+      setTimeout(() => this.#sendCmd(`info ${address}`), 500);
+    }
   }
-}
 
-const delBtDevice = (line) => {
-  // console.log('delBtDevice: ' + line);
-  if (line.includes("Device")) {
-    let address = line.split(' ')[2];
-    bth.devices = bth.devices.filter(item => item.Address != address)
+  #handleChg(line) {
+    // [CHG] Controller AA:BB:CC:DD:EE:FF Property: value
+    // [CHG] Device     AA:BB:CC:DD:EE:FF Property: value
+    const parts = line.split(' ');
+    const kind    = parts[1];   // 'Controller' or 'Device'
+    const address = parts[2];
+    const rest    = parts.slice(3).join(' ');  // "Property: value"
+
+    if (kind === 'Controller') {
+      this.#lastCtrlAddress = address;
+      this.#applyControllerLine(rest);
+    } else if (kind === 'Device') {
+      this.#lastDevAddress = address;
+      this.#applyDeviceLine(rest);
+    }
   }
-}
 
-const parseLastCommandRes = (cmd, line) => {
-  if (line == '') return;
-  if (cmd === 'show' || cmd === 'list' || cmd === 'select')
-    controllerUpdate(line);
-  else if (cmd === 'devices')
-    devicesCmd(line);
-  else if (cmd === 'info')
-    infoCmd(line);
-}
+  #handleDel(line) {
+    // [DEL] Device AA:BB:CC:DD:EE:FF Friendly Name
+    if (!line.includes('Device')) return;
+    const address = line.split(' ')[2];
+    this.#devices = this.#devices.filter(d => d.Address !== address);
+    log.info(`device removed: ${address}`);
+    this.emit(btEvents.DEVICE_REMOVED, { address });
+  }
 
-var lastCommand = null;
+  // ── private: state appliers ───────────────────────────────────────────────
 
-const parseBluetoothctl = (data) => {
-  for (let line of data.split(/\n|\r/)) {
-    // console.log('parsing: "' + line + '"');
-    if (line == '') continue;
-    bthLogger(line);
-    if (line.startsWith('[NEW]')) {
-      newBtDevice(line);
+  /** Apply a single property line to a controller record. */
+  #applyControllerLine(line) {
+    // "Controller AA:BB:CC:DD:EE:FF [default]"  — introduces a controller
+    if (line.startsWith('Controller')) {
+      const parts   = line.split(' ');
+      const address = parts[1];
+      this.#lastCtrlAddress = address;
+      if (!this.#controllerByAddress(address)) {
+        this.#controllers.push({ Address: address, ConnectedDevice: null });
+      }
+      if (line.includes('[default]')) {
+        this.#selectedCtrl = this.#controllerByAddress(address);
+      }
       return;
     }
-    if (line.startsWith('[CHG]')) {
-      updateBtDevice(line);
+
+    const ctrl = this.#controllerByAddress(this.#lastCtrlAddress);
+    if (!ctrl) return;
+
+    const [key, ...valParts] = line.split(':');
+    const val = valParts.join(':').trim();
+
+    switch (key.trim()) {
+      case 'Name':        ctrl.Name          = val; break;
+      case 'Pairable':    ctrl.Pairable      = val; break;
+      case 'Discovering': ctrl.Discovering   = val; break;
+      case 'Discoverable':ctrl.Discoverable  = val; break;
+      case 'Powered': {
+        const prev = ctrl.Powered;
+        ctrl.Powered = val;
+        if (val === 'yes' && prev !== 'yes') {
+          log.info(`controller ${ctrl.Address} powered on`);
+          this.emit(btEvents.CONTROLLER_POWERED_ON, { address: ctrl.Address });
+          this.#scanOn();
+        }
+        if (val === 'no' && prev === 'yes') {
+          log.info(`controller ${ctrl.Address} powered off`);
+          this.emit(btEvents.CONTROLLER_POWERED_OFF, { address: ctrl.Address });
+          this.#scanOff();
+          if (ctrl.ConnectedDevice) {
+            ctrl.ConnectedDevice = null;
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  /** Apply a single property line to a device record. */
+  #applyDeviceLine(line) {
+    // "Device AA:BB:CC:DD:EE:FF"  — introduces a device context in info output
+    if (line.startsWith('Device')) {
+      const address = line.split(' ')[1];
+      this.#lastDevAddress = address;
+      if (!this.#deviceByAddress(address)) {
+        this.#devices.push({ Address: address });
+      }
       return;
     }
-    if (line.startsWith('[DEL]')) {
-      delBtDevice(line);
-      return;
+
+    const dev = this.#deviceByAddress(this.#lastDevAddress);
+    if (!dev) return;
+
+    const [key, ...valParts] = line.split(':');
+    const val = valParts.join(':').trim();
+
+    switch (key.trim()) {
+      case 'Name':    if (!line.includes('is nil')) dev.Name    = val; break;
+      case 'Icon':    dev.Icon    = val; break;
+      case 'Blocked': dev.Blocked = val; break;
+      case 'Paired':  dev.Paired  = val; break;
+      case 'Trusted': dev.Trusted = val; break;
+      case 'RSSI':    dev.RSSI    = val; break;
+      case 'Battery Percentage': {
+        // val is e.g. "0x50 (80)" — extract the decimal part
+        const match = val.match(/\((\d+)\)/);
+        if (match) {
+          const battery = `${match[1]}%`;
+          dev.battery = battery;
+          log.info(`battery ${dev.Address}: ${battery}`);
+          this.emit(btEvents.DEVICE_BATTERY_CHANGED, { address: dev.Address, battery });
+        }
+        break;
+      }
+      case 'Connected': {
+        dev.Connected = val;
+        if (val === 'yes' && this.#selectedCtrl) {
+          this.#selectedCtrl.ConnectedDevice = dev;
+          log.info(`device connected: ${dev.Address}`);
+          this.emit(btEvents.DEVICE_CONNECTED, { address: dev.Address, name: dev.Name });
+          this.#onDeviceConnected(dev);
+        }
+        if (val === 'no' && this.#selectedCtrl?.ConnectedDevice?.Address === dev.Address) {
+          this.#selectedCtrl.ConnectedDevice = null;
+          log.info(`device disconnected: ${dev.Address}`);
+          this.emit(btEvents.DEVICE_DISCONNECTED, { address: dev.Address });
+          this.#onDeviceDisconnected(dev);
+        }
+        break;
+      }
     }
-    // only commands that output something that requires to be parsed are saved
-    // other commands result are provided by [NEW], [CHG] and [DEL] events
-    if (line.startsWith('list'))
-      lastCommand = 'list';
-    else if (line.startsWith('select'))
-      lastCommand = 'select';
-    else if (line.startsWith('show'))
-      lastCommand = 'show';
-    else if (line.startsWith('info'))
-      lastCommand = 'info';
-    else if (line.startsWith('devices'))
-      lastCommand = 'devices';
-    else
-      parseLastCommandRes(lastCommand, line);
   }
-  // console.log(bth);
+
+  /** Parse a "devices" command response line: "Device AA:BB:CC:DD Friendly Name" */
+  #applyDevicesLine(line) {
+    if (!line.startsWith('Device')) return;
+    const parts   = line.split(' ');
+    const address = parts[1];
+    const name    = parts.slice(2).join(' ');
+    if (!this.#deviceByAddress(address)) {
+      this.#devices.push({ Address: address, Name: name });
+    }
+  }
+
+  // ── private: connection lifecycle helpers ─────────────────────────────────
+
+  async #onDeviceConnected(dev) {
+    await this.#saveLastConnected(dev.Address);
+    this.#scanOff();
+    // wait for the sink to be registered in PipeWire before switching
+    await this.#sleep(5000);
+    // import pactl lazily to avoid circular dependency (bt ← mpd ← bt)
+    const { default: pactl } = await import('./pactl.js');
+    await pactl.setDefaultSink(pactl.btSinkName(dev.Address));
+  }
+
+  async #onDeviceDisconnected(dev) {
+    if (dev.battery) delete dev.battery;
+    await this.#sleep(200);
+    if (this.#selectedCtrl?.Powered === 'yes') this.#scanOn();
+  }
+
+  // ── private: scanning ─────────────────────────────────────────────────────
+
+  async #scanOn() {
+    await this.#sleep(200);
+    this.#sendCmd('discoverable on');
+    if (this.#selectedCtrl?.Pairable === 'no') {
+      await this.#sleep(200);
+      this.#sendCmd('pairable on');
+    }
+    await this.#sleep(200);
+    this.#sendCmd('scan on');
+  }
+
+  #scanOff() {
+    if (this.#selectedCtrl?.Pairable === 'yes') {
+      this.#sendCmd('discoverable off');
+    }
+    this.#sendCmd('scan off');
+  }
+
+  // ── private: persistence ──────────────────────────────────────────────────
+
+  async #saveLastConnected(address) {
+    try {
+      const content = await cfgfile.read();
+      if (!content.bt) content.bt = {};
+      if (content.bt.lastConnected === address) return;
+      content.bt.lastConnected = address;
+      await cfgfile.save(content);
+      log.info(`last connected device saved: ${address}`);
+    } catch (err) {
+      log.error(`failed to save last connected device: ${err.message}`);
+    }
+  }
+
+  // ── private: lookup helpers ───────────────────────────────────────────────
+
+  #controllerByAddress(address) {
+    return this.#controllers.find(c => c.Address === address) ?? null;
+  }
+
+  #deviceByAddress(address) {
+    return this.#devices.find(d => d.Address === address) ?? null;
+  }
+
+  // ── private: logging ──────────────────────────────────────────────────────
+
+  #log(line) {
+    if (this.#logBuffer.length >= this.#logMaxLen) this.#logBuffer.shift();
+    this.#logBuffer.push(line);
+  }
+
+  // ── private: utilities ────────────────────────────────────────────────────
+
+  #sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 }
 
-var bluetoothctl = null;
+// ---------------------------------------------------------------------------
+// Singleton
+// ---------------------------------------------------------------------------
 
-const bluetoothctlInput = (cmd) => {
-  log.info('bluetoothctl stdin: ' + cmd);
-  if (bluetoothctl) bluetoothctl.stdin.write(cmd + '\n');
-  // manage exceptions
-  if (cmd.includes('power')) setTimeout(bluetoothctlInput, 2000, 'show');
-}
+const btService = new BtService();
 
-const bluetoothctlStart = () => {
-  if (bluetoothctl) bluetoothctlStop();
-  bluetoothctl = spawn('bluetoothctl');
-
-  bluetoothctl.stdout.on('data', (data) => {
-    parseBluetoothctl(stripAnsi(data.toString())
-      .replace(/\u0001|\u0002/g, ''));
-  });
-
-  bluetoothctl.stderr.on('data', (data) => {
-    console.log(`bluetoothctl stderr: ${data}`);
-  });
-
-  bluetoothctl.on('close', (code) => {
-    log.info(`bluetoothctl exited with code ${code}.`);
-    bluetoothctlStart();
-  });
-
-  btEvent.emit(events.BT_START);
-}
-
-const bluetoothctlStop = () => {
-  if (bluetoothctl) bluetoothctl.kill('SIGINT');
-  btEvent.emit(events.BT_END);
-}
-
-const controllerScanOn = async () => {
-  await btWait(200);
-  bluetoothctlInput('discoverable on');
-  if (bth.selectedCtrl.Pairable && bth.selectedCtrl.Pairable == 'no') {
-    await btWait(200);
-    bluetoothctlInput('pairable on');
-  }
-  await btWait(200);
-  bluetoothctlInput('scan on');
-}
-
-const controllerScanOff = async () => {
-  if (bth.selectedCtrl.Pairable && bth.selectedCtrl.Pairable == 'yes') {
-    bluetoothctlInput('discoverable off');
-  }
-  bluetoothctlInput('scan off');
-}
-
-btEvent.on(events.BT_START, async () => {
-  log.info("starting bluetoothctl...");
-  // init bth
-  bth = {};
-  bth.controllers = [];
-  bth.selectedCtrl = null;
-  bth.devices = [];
-  await btWait(1000);
-  bluetoothctlInput('list');
-  await btWait(1000);
-  bluetoothctlInput(`show ${bth.selectedCtrl.Address}`);
-  await btWait(1000);
-  bluetoothctlInput('devices');
-  await btWait(1000);
-  for (let idx = 0; idx < bth.devices.length; idx++) {
-    await btWait(1000);
-    bluetoothctlInput(`info ${bth.devices[idx].Address}`);
-  }
-})
-
-btEvent.on(events.BT_END, address => {
-  log.info("ending bluetoothctl...");
-  if (btTimer) {
-    clearTimeout(btTimer);
-    btTimer = null;
-  }
-})
-
-btEvent.on(events.BT_POWERON, async () => {
-  log.info("BT powered on...");
-  controllerScanOn();
-})
-
-btEvent.on(events.BT_POWEROFF, () => {
-  log.info("BT powered off...");
-  controllerScanOff();
-  if (bth.selectedCtrl != null && bth.selectedCtrl.ConnectedDevice != null) {
-    bth.selectedCtrl.ConnectedDevice = null;
-    clearInterval(btUpdateBatteryTimer);
-    btUpdateBatteryTimer = null;
-  }
-})
-
-btEvent.on(events.DEV_CONNECTED, async address => {
-  log.info(`device ${address} connected`);
-  await saveLastDeviceConnected(address);
-  let BTdevice = bth.selectedCtrl.ConnectedDevice;
-  await btWait(5000);
-  await pactl.setDefaultSink(pactl.btSinkName(address));
-  btEvent.emit(events.DEV_AVAILABLE, address);
-  controllerScanOff();
-  await updateBattery();
-})
-
-btEvent.on(events.DEV_AVAILABLE, async address => {
-  log.info(`device ${address} provisioned and available`);
-})
-
-btEvent.on(events.DEV_DISCONNECTED, async address => {
-  log.info(`device ${address} disconnected`);
-  let dev = bth.devices.find(item => item.Address == address);
-  if (dev.battery) delete dev.battery;
-  clearInterval(btUpdateBatteryTimer);
-  btUpdateBatteryTimer = null;
-  await btWait(200);
-  if (bth.selectedCtrl.Powered == 'yes') controllerScanOn();
-})
-
-export default {
-  bluetoothctlStart: bluetoothctlStart,
-  bluetoothctlStop: bluetoothctlStop,
-  cmd: bluetoothctlInput,
-  event: btEvent,
-  events: events,
-  status: () => bth,
-  getLog: () => bthLog,
-  btReset: bluetoothctlStart
-};
+export default btService;
+export { btService, btEvents };

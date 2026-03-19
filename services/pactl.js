@@ -131,7 +131,7 @@ const volumeDec = async (channel = 'both', sink = '@DEFAULT_SINK@') => {
  * Mute or unmute.  val: "mute" | "unmute"
  */
 const volumeMute = async (val, sink = '@DEFAULT_SINK@') => {
-  console.log(`volumeMute(${val}, ${sink})`);
+  // console.log(`volumeMute(${val}, ${sink})`);
   if (val !== 'mute' && val !== 'unmute') throw new Error(`Invalid mute value: ${val}`);
   await pactlRun('set-sink-mute', sink, val === 'mute' ? '1' : '0');
   return volumeGet(sink);
@@ -230,7 +230,7 @@ class PactlService extends EventEmitter {
 
   async #handleSubscribeLine(line) {
     if (!line) return;
-    console.log(`pactl event: ${line}`);
+    // console.log(`pactl event: ${line}`);
 
     const isSinkChange = /Event 'change' on sink #/.test(line);
     const isServerChange = /Event 'change' on server #/.test(line);
@@ -245,7 +245,7 @@ class PactlService extends EventEmitter {
           sinkName: sinkName,
           sinkType: sinkType(sinkName)
         };
-        console.log(defaultSink.sinkType);
+        // console.log(defaultSink.sinkType);
         this.emit(PactlEvents.DEFAULT_SINK_CHANGED, defaultSink);
         log.info(`default_sink_changed → ${JSON.stringify(defaultSink)}`);
       } catch (err) {
@@ -268,7 +268,14 @@ class PactlService extends EventEmitter {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Singleton
+// ---------------------------------------------------------------------------
+
 const pactlService = new PactlService();
+
+setDefaultSink(config.get('pactl.defaultSink'));
+
 
 export default {
   btSinkName,

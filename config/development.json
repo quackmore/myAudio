@@ -1,0 +1,27 @@
+{
+    "httpd": {
+        "port": 3000
+    },
+    "logger": {
+        "console_log": "ON",
+        "log_path": "local-log"
+    },
+    "player": {
+        "bt_output": "Bluetooth",
+        "bt_battery": "/home/flintheart/bin/bt-battery.py",
+        "streamingPlaylist": "/home/flintheart/.config/mpd/playlists/streaming.m3u",
+        "streamingReconnectTimeout": 10000,
+        "streamingReconnectCount": 6,
+        "podcastDownloads": "/home/flintheart/Music",
+        "podcastRemovedAfterDays": 7
+    },
+    "pactl": {
+        "defaultSink": "alsa_output.usb-Generic_iStore_Audio_20210726905926-00.analog-stereo"
+    },
+    "speakers": {
+        "contactDevice": "192.168.1.211",
+        "contactRelay": 2,
+        "card": "2",
+        "volumeCtrl": "PCM"
+    }
+}
