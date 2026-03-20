@@ -247,6 +247,8 @@
     const btDevDefault = 'Bluetooth';
     var btDevName = btDevDefault;
 
+    // OUTPUT
+
     function setOutput(output) {
       if (output === 'Speakers') {
         document.getElementById('outSel').innerText = 'Speakers';
@@ -271,10 +273,10 @@
         cfg = await readCfg();
         cfg.output = newOutput;
         saveCfg(cfg);
-        if (newOutput === 'Speakers')
-          refreshSpeakersStatus();
+        if (newOutput === 'Bluetooth')
+          updateBT();
         else
-          refreshBtStatus();
+          updateSpeakers();
       }
       catch (err) { alert(err.message) }
     }
@@ -289,15 +291,6 @@
       try {
         loadSpinner();
         await toutFetch(url, 5000, req);
-        if (getOutput() === 'Speakers')
-          refreshSpeakersStatus();
-        else {
-          if (btPowered === 'yes') {// 
-            url = 'bt/reset';
-            await toutFetch(url, 5000, req);
-          }
-          setTimeout(refreshBtStatus, 1500);
-        }
       }
       catch (err) {
         alert(err.message);
@@ -324,40 +317,18 @@
     // SPEAKERS
 
     player.speakers = {};
+    player.speakers.power = null;
 
     const getSpeakerStatus = () => {
       return toutFetch('/speakers/status', 5000)
         .then(res => res.json())
-        .then(data => player.speakers = data)
+        .then(data => player.speakers = { ...player.speakers, ...data })
     }
 
-    const updateSpeakers = async () => {
-      if (!player.speakers) return;
-      document.getElementById('outputSwitch').innerHTML = (player.speakers.speakerOn === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
-      // document.getElementById('volRange').value = player.speakers.volume.split("%")[0];
-      // document.getElementById('volRange').disabled = false;
-      // document.getElementById('volLevel').innerText = player.speakers.volume.split("%")[0];
-      // document.getElementById('volMute').innerHTML = player.speakers.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
-      closeBtDevMod();
-    }
-
-    let getSpeakersStatusFail = 0;
-
-    const refreshSpeakersStatus = async () => {
+    const updateSpeakers = (val = {}) => {
+      if (Object.keys(val).length > 0) player.speakers = { ...player.speakers, ...val };
       if (getOutput() !== 'Speakers') return;
-      try {
-        {
-          await getSpeakerStatus();
-          await updateSpeakers();
-        }
-        getSpeakersStatusFail = 0;
-      } catch (err) {
-        getSpeakersStatusFail++;
-        if (getSpeakersStatusFail > 2)
-          alert(err.message);
-        else
-          setTimeout(refreshSpeakersStatus, 500);
-      }
+      document.getElementById('outputSwitch').innerHTML = (player.speakers.power === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
     }
 
     // MPD PLAYER
@@ -519,54 +490,6 @@
 
     // BLUETOOTH
 
-    const getBtStatus = () => {
-      return toutFetch(`/bt/status`, 5000)
-        .then(res => res.json())
-        .then(data => player.bt = data)
-    }
-
-    const mustShowBtDevices = () => {
-      return (document.getElementById('outSel').innerText !== 'Speakers' &&
-        player.hasOwnProperty('bt') &&
-        player.bt.selectedCtrl != null &&
-        player.bt.selectedCtrl.Powered === 'yes' &&
-        player.bt.selectedCtrl.ConnectedDevice == null);
-    }
-
-    let getBtStatusFail = 0;
-
-    const refreshBtStatus = async () => {
-      if (document.getElementById('outSel').innerText === 'Speakers') return;
-      try {
-        {
-          await getBtStatus();
-          updateBT();
-        }
-        getBtStatusFail = 0;
-      } catch (err) {
-        getBtStatusFail++;
-        if (getBtStatusFail > 2)
-          alert(err.message);
-        else
-          setTimeout(refreshBtStatus, 500);
-      }
-    }
-
-    let refreshPlayerInterval = null;
-    const periodicRefreshStatus = (val) => {
-      clearInterval(refreshPlayerInterval);
-      refreshPlayerInterval = setInterval(refreshPlayerStatus, val);
-    }
-
-    let refreshBtInterval = null;
-    const periodicRefreshBt = (val) => {
-      clearInterval(refreshBtInterval);
-      if (val > 0)
-        refreshBtInterval = setInterval(refreshBtStatus, val);
-      else
-        refreshBtInterval = null;
-    }
-
     const connectDev = async (idx) => {
       loadSpinner();
       try {
@@ -606,6 +529,61 @@
       document.getElementById("btDevMod").style.display = "none";
     }
 
+    const getBtStatus = () => {
+      return toutFetch(`/bt/status`, 5000)
+        .then(res => res.json())
+        .then(data => {
+          player.bt = data;
+          console.log('getBtStatus', player.bt);
+        })
+    }
+
+    const updateBTctrlPower = (val = {}) => {
+      if (Object.keys(val).length > 0) {
+        console.log('before', player.bt);
+        console.log('updateBTctrlPower - updating with val', val);
+        player.bt.controllers = player.bt.controllers.map(item => {
+          item.Address === val.Address
+            ? { ...item, Powered: val.Powered } : item
+        });
+        // if (player.bt.selectedCtrl.Address === val.Address)
+        //   player.bt.selectedCtrl.Powered = val.Powered;
+      }
+      console.log('after', player.bt);
+      if (getOutput() !== 'Bluetooth') return;
+      let ctrl = player.bt.selectedCtrl;
+      // update the switch status
+      document.getElementById('outputSwitch').innerHTML = (ctrl.Powered === 'yes' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
+    }
+
+    const updateBTdevices = (val = {}) => {
+      console.log('updateBTdevices', val);
+      if (Object.keys(val).length > 0) {
+        let { type, ...devInfo } = val;
+        if (val.type === 'bt_device_found') {
+          if (!player.bt.devices.some(dev => dev.Address === val.Address))
+            player.bt.devices.push(devInfo);
+        } else if (val.type === 'bt_device_removed') {
+          player.bt.devices = player.bt.devices.filter(dev => dev.Address !== val.Address);
+        }
+      }
+      if (getOutput() !== 'Bluetooth' ||
+        Object.keys(player.bt.selectedCtrl).length === 0 ||
+        player.bt.selectedCtrl.Powered === 'no' ||
+        player.bt.selectedCtrl.ConnectedDevice !== null ||
+        Object.keys(player.bt.devices).length === 0) {
+        closeBtDevMod();
+        return;
+      }
+      let tmpList = "";
+      for (let [idx, dev] of player.bt.devices.entries()) {
+        tmpList += `<div class="justify"><span class="pointer" onclick="connectDev(${idx})">${dev.Name}</span><span class="right"><i class="fa-regular fa-trash-can pointer" onclick="deleteDev(${idx})"></i></span></div>`;
+      }
+      let btDevList = document.getElementById('btDevList');
+      btDevList.innerHTML = tmpList;
+      openBtDevMod();
+    }
+
     const updateBTdesc = () => {
       if (player.bt.selectedCtrl.ConnectedDevice) {
         let connected = player.bt.selectedCtrl.ConnectedDevice;
@@ -632,74 +610,12 @@
       }
     }
 
-    const updateBTvolume = () => {
-      //  if (player.bt.selectedCtrl.ConnectedDevice) {
-      //    let connected = player.bt.selectedCtrl.ConnectedDevice;
-      //    if (connected.volume) {
-      //      document.getElementById('volRange').value = connected.volume.volume.split("%")[0];
-      //      document.getElementById('volLevel').innerText = connected.volume.volume.split("%")[0];
-      //      document.getElementById('volLeft').innerText = connected.volume.volumeLeft.split("%")[0];
-      //      document.getElementById('volRight').innerText = connected.volume.volumeRight.split("%")[0];
-      //      document.getElementById('volRange').disabled = false;
-      //      document.getElementById('volMute').innerHTML = connected.volume.mute === "yes" ? '<i class="fa-solid fa-volume-xmark actC"></i>' : '<i class="fa-solid fa-volume-high actC"></i>';
-      //    }
-      //  } else {
-      //    document.getElementById('volRange').value = 0;
-      //    document.getElementById('volRange').disabled = true;
-      //    document.getElementById('volLevel').innerText = 0;
-      //    document.getElementById('volLeft').innerText = 0;
-      //    document.getElementById('volRight').innerText = 0;
-      //    document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark actC"></i>';
-      //  }
-    }
-
-    let prevCtrl = {
-      Powered: null,
-      ConnectedDevice: null,
-      counter: 0
-    };
-
     const updateBT = () => {
-      if (!player.hasOwnProperty('bt')) return;
-      let ctrl = player.bt.selectedCtrl;
-      // update the switch status
-      document.getElementById('outputSwitch').innerHTML = (ctrl.Powered === 'yes' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
-
-      if (mustShowBtDevices()) {
-        if (!player.bt.hasOwnProperty('devices')) return;
-        // TODO: 
-        let tmpList = "";
-        for (let [idx, dev] of player.bt.devices.entries()) {
-          tmpList += `<div class="justify"><span class="pointer" onclick="connectDev(${idx})">${dev.Name}</span><span class="right"><i class="fa-regular fa-trash-can pointer" onclick="deleteDev(${idx})"></i></span></div>`;
-        }
-        let btDevList = document.getElementById('btDevList');
-        btDevList.innerHTML = tmpList;
-        openBtDevMod();
-      }
-      else
-        closeBtDevMod();
-
+      // if (Object.keys(val).length > 0) player.bt = { ...player.bt, ...val };
+      if (getOutput() !== 'Bluetooth') return;
+      updateBTctrlPower();
+      updateBTdevices();
       updateBTdesc();
-      updateBTvolume();
-
-      // set the timer for next BT update
-      if (ctrl.Powered != prevCtrl.Powered) {
-        periodicRefreshBt(1000);
-        prevCtrl.Powered = ctrl.Powered;
-        prevCtrl.counter = 0;
-      }
-      let ConnectedDevice = (ctrl.ConnectedDevice != null);
-      if (ConnectedDevice == prevCtrl.ConnectedDevice) {
-        prevCtrl.counter++;
-        if (ctrl.Powered == 'yes' && ConnectedDevice && prevCtrl.counter > 8)
-          periodicRefreshBt(10000);
-        if (ctrl.Powered == 'no' && !ConnectedDevice && prevCtrl.counter > 8)
-          periodicRefreshBt(0);
-      } else {
-        prevCtrl.ConnectedDevice = ConnectedDevice;
-        prevCtrl.counter = 0;
-        periodicRefreshBt(1000);
-      }
     }
 
     // VOLUME
@@ -727,11 +643,6 @@
       } catch (err) {
         alert(`Failed to set volume to ${vol} - ${err.message}`);
       }
-      if (getOutput() === 'Speakers') {
-        await refreshSpeakersStatus();
-      } else {
-        await refreshBtStatus();
-      }
       unloadSpinner();
     }
 
@@ -750,11 +661,6 @@
       } catch (err) {
         alert(`Failed to increase volume - ${err.message}`);
       }
-      if (getOutput() === 'Speakers') {
-        await refreshSpeakersStatus();
-      } else {
-        await refreshBtStatus();
-      }
       unloadSpinner();
     }
 
@@ -769,11 +675,6 @@
       } catch (err) {
         alert(`Failed to decrease volume - ${err.message}`);
       }
-      if (getOutput() === 'Speakers') {
-        await refreshSpeakersStatus();
-      } else {
-        await refreshBtStatus();
-      }
       unloadSpinner();
     }
 
@@ -784,11 +685,6 @@
         await toutFetch(`/pactl/volume/mute/${player.speakers.mute === "yes" ? "unmute" : "mute"}`, 60000, { method: 'POST' });
       } catch (err) {
         alert(`Failed to set volume to [mute|unmute] - ${err.message}`);
-      }
-      if (getOutput() === 'Speakers') {
-        await refreshSpeakersStatus();
-      } else {
-        await refreshBtStatus();
       }
       unloadSpinner();
     }
@@ -1637,16 +1533,50 @@
 
       es.onmessage = (e) => {
         const event = JSON.parse(e.data);
+        console.log('Received SSE event:', event); // Debug log for received events
         switch (event.type) {
+          case 'connected':
+            console.log('SSE connected');
+            getPactlStatus();
+            break;
+          // PACTL
           case 'volume_changed':
             updateVolume(event.data);
             break;
           case 'default_sink_changed':
             setOutput(event.data.type === 'speakers' ? 'Speakers' : 'Bluetooth');
             break;
-          case 'connected':
-            console.log('SSE connected');
-            getPactlStatus();
+          // SPEAKERS
+          case 'speakers_powered_on':
+            updateSpeakers(event.data);
+            break;
+          case 'speakers_powered_off':
+            updateSpeakers(event.data);
+            break;
+          // BLUETOOTH
+          case 'bt_controller_powered_on':   // { address }
+            updateBTctrlPower({ Address: event.data.address, Powered: "yes" });
+            updateBTdevices();
+            break;
+          case 'bt_controller_powered_off':  // { address }
+            updateBTctrlPower({ Address: event.data.address, Powered: "no" });
+            closeBtDevMod();
+            break;
+          case 'bt_device_found':             // { address, name }
+            updateBTdevices({ type: event.type, Address: event.data.address, Name: event.data.name });
+            break;
+          case 'bt_device_connected':         // { address, name }
+            //
+            closeBtDevMod();
+            break;
+          case 'bt_device_disconnected':      // { address }
+            //
+            updateBTdevices();
+            break;
+          case 'bt_device_removed':           // { address }
+            updateBTdevices({ type: event.type, Address: event.data.address });
+            break;
+          case 'bt_device_battery_changed':  // { address, battery }
             break;
         }
       };
@@ -1680,17 +1610,14 @@
       initSSE();
       await getPactlStatus();
       await getSpeakerStatus();
+      await updateSpeakers();
       await getBtStatus();
-      if (getOutput() === 'Speakers')
-        await updateSpeakers();
-      else
-        await updateBT();
+      await updateBT();
       await getMpdStatus();
       await updateMpdPlayer();
 
       initEventListeners();
       loadQueue();
-      periodicRefreshStatus(30000);
       unloadSpinner();
     }
 

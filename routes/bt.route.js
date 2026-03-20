@@ -4,7 +4,7 @@ import btService from '../services/bt.js';
 const router = express.Router();
 
 router.post('/reset', async function (req, res, next) {
-  btService.btServiceReset();
+  btService.reset();
   res.status(200).send('got it!');
 });
 
