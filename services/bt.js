@@ -41,7 +41,9 @@ class BtService extends EventEmitter {
   #lastCtrlAddress  = null;   // address context for multi-line controller output
   #lastDevAddress   = null;   // address context for multi-line device output
 
-  // timers (reserved for future use)
+  // battery polling
+  #batteryTimer     = null;   // setInterval handle, active only while a device is connected
+  #batteryPollMs    = 60_000; // poll every 60 s
 
   // ── public lifecycle ──────────────────────────────────────────────────────
 
@@ -53,6 +55,7 @@ class BtService extends EventEmitter {
 
   stop() {
     this.#restarting = false;
+    this.#stopBatteryTimer();
     if (this.#proc) {
       this.#proc.kill('SIGINT');
       this.#proc = null;
@@ -353,25 +356,43 @@ class BtService extends EventEmitter {
   // ── private: connection lifecycle helpers ─────────────────────────────────
 
   async #onDeviceConnected(dev) {
-    // get full info to populate battery level (if available) as soon as possible
-    // TODO: probably should start a timer interval to poll battery level until disconnect, since I doubt the BT stacks push battery updates automatically
-    this.#sendCmd(`info ${dev.Address}`); 
     await this.#saveLastConnected(dev.Address);
     this.#scanOff();
-    // FIXME: not the best place for this, better to avoid circular dependency
-    // FIXME: ideally we would detect the audio sink appearing in real time and switch immediately, rather than assuming a fixed delay will work for everyone
-    // wait for the sink to be registered in PipeWire before switching
-    await this.#sleep(10000);
-    // import pactl lazily to avoid circular dependency (bt ← mpd ← bt)
-    const { default: pactl } = await import('./pactl.js');
-    await pactl.setDefaultSink(pactl.btSinkName(dev.Address));
+    this.#startBatteryTimer(dev.Address);
   }
 
   async #onDeviceDisconnected(dev) {
-    // TODO: stop the timer interval started in #onDeviceConnected to poll battery level
+    this.#stopBatteryTimer();
     if (dev.battery) delete dev.battery;
     await this.#sleep(200);
     if (this.#selectedCtrl?.Powered === 'yes') this.#scanOn();
+  }
+
+  // ── private: battery polling ──────────────────────────────────────────────
+
+  /**
+   * Start a periodic timer that queries `info <address>` every #batteryPollMs.
+   * The response feeds through the existing #applyDeviceLine → DEVICE_BATTERY_CHANGED
+   * pipeline, so no extra parsing is needed here.
+   * BlueZ may also push [CHG] Battery Percentage lines spontaneously; the timer
+   * catches devices that don't push proactively.
+   */
+  #startBatteryTimer(address) {
+    this.#stopBatteryTimer(); // clear any leftover timer
+    log.info(`battery poll started for ${address} (every ${this.#batteryPollMs / 1000}s)`);
+    this.#batteryTimer = setInterval(() => {
+      if (!this.#proc) return;
+      log.debug?.(`battery poll: info ${address}`);
+      this.#sendCmd(`info ${address}`);
+    }, this.#batteryPollMs);
+  }
+
+  #stopBatteryTimer() {
+    if (this.#batteryTimer) {
+      clearInterval(this.#batteryTimer);
+      this.#batteryTimer = null;
+      log.info('battery poll stopped');
+    }
   }
 
   // ── private: scanning ─────────────────────────────────────────────────────

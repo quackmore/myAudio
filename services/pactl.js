@@ -2,6 +2,7 @@ import log from './logger.js';
 import config from 'config';
 import { spawn } from 'child_process';
 import EventEmitter from 'events';
+import { btService, btEvents } from './bt.js';
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -9,20 +10,19 @@ import EventEmitter from 'events';
 
 /**
  * Derive the PipeWire sink name from a Bluetooth MAC address.
- * e.g. "01:15:21:47:16:D4" → "bluez_output.01_15_21_47_16_D4.a2dp_sink"
+ * e.g. "01:15:21:47:16:D4" → "bluez_output.01_15_21_47_16_D4.1"
  */
 const btSinkName = (address) =>
   `bluez_output.${address.replaceAll(':', '_')}.1`;
 
 /**
  * Derive the PipeWire sink type from the sink name.
- * e.g. "01:15:21:47:16:D4" → "bluez_output.01_15_21_47_16_D4.a2dp_sink"
  */
 const sinkType = (name) =>
   name.startsWith('bluez_output') ? 'bt' : 'speakers';
 
 /**
- * Run a pactl command, return { stdout, stderr, exitCode }.
+ * Run a pactl command, return stdout as a string.
  */
 const pactlRun = async (...args) => {
   const cmd = spawn('pactl', args);
@@ -44,10 +44,6 @@ const pactlRun = async (...args) => {
  *   { volumeLeft: "60%", volumeRight: "60%", volume: "60%" }
  *
  * Handles both stereo ("front-left / front-right") and mono ("mono") sinks.
- *
- * Example pactl output:
- *   Volume: front-left: 39320 /  60% / -13.31 dB,   front-right: 39320 /  60% / -13.31 dB
- *   Volume: mono: 65536 / 100% / 0.00 dB
  */
 const parseVolume = (raw) => {
   const pct = [...raw.matchAll(/(\d+)%/g)].map(m => m[1]);
@@ -93,8 +89,6 @@ const volumeSet = async (value, sink = '@DEFAULT_SINK@') => {
 
 /**
  * Increment volume by 1% (optionally per-channel: 'frontleft' | 'frontright').
- * PipeWire does not support per-channel relative increments via pactl, so for
- * balance adjustments we read current levels and compute the new absolute value.
  */
 const volumeInc = async (channel = 'both', sink = '@DEFAULT_SINK@') => {
   if (channel === 'both') {
@@ -131,19 +125,14 @@ const volumeDec = async (channel = 'both', sink = '@DEFAULT_SINK@') => {
  * Mute or unmute.  val: "mute" | "unmute"
  */
 const volumeMute = async (val, sink = '@DEFAULT_SINK@') => {
-  // console.log(`volumeMute(${val}, ${sink})`);
   if (val !== 'mute' && val !== 'unmute') throw new Error(`Invalid mute value: ${val}`);
   await pactlRun('set-sink-mute', sink, val === 'mute' ? '1' : '0');
   return volumeGet(sink);
 };
 
 /**
- * Switch the active output.  Both MPD (pulse, no device) and the volume
+ * Switch the active output sink.  Both MPD (pulse, no device) and the volume
  * functions above target @DEFAULT_SINK@, so this one call reroutes everything.
- *
- * sinkName: full PipeWire sink name, e.g.
- *   btSinkName("01:15:21:47:16:D4")
- *   "alsa_output.usb-Generic_iStore_Audio_20210726905926-00.analog-stereo"
  */
 const setDefaultSink = async (sinkName) => {
   await pactlRun('set-default-sink', sinkName);
@@ -167,8 +156,17 @@ const PactlEvents = {
 
 class PactlService extends EventEmitter {
 
-  #watcherProc = null;
-  #restarting = true;
+  #watcherProc  = null;
+  #restarting   = true;
+
+  // When a BT device connects we store the sink name we are waiting for.
+  // The subscribe watcher checks each new sink against this value and
+  // switches immediately when it appears, cancelling the fallback timeout.
+  #pendingBtSink        = null;   // string | null
+  #pendingBtSinkTimeout = null;   // fallback setTimeout handle
+
+  // Debounce handle for restoring the speakers sink after disconnect.
+  #disconnectDebounce = null;
 
   // -------------------------------------------------------------------------
   // Watcher lifecycle
@@ -181,6 +179,8 @@ class PactlService extends EventEmitter {
 
   stopWatcher() {
     this.#restarting = false;
+    clearTimeout(this.#pendingBtSinkTimeout);
+    clearTimeout(this.#disconnectDebounce);
     if (this.#watcherProc) {
       this.#watcherProc.kill();
       this.#watcherProc = null;
@@ -204,7 +204,6 @@ class PactlService extends EventEmitter {
     proc.on('close', (code) => {
       this.#watcherProc = null;
       if (this.#restarting === false) return;
-      // unexpected exit — restart after a short delay
       log.warn(`pactl subscribe exited (${code}), restarting in 3s`);
       setTimeout(() => this.#spawnWatcher(), 3000);
     });
@@ -214,38 +213,142 @@ class PactlService extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // BT device connected — wait for sink to appear, then switch
+  // -------------------------------------------------------------------------
+
+  /**
+   * Called when a BT device connects.
+   *
+   * Rather than sleeping a fixed duration, we arm #pendingBtSink with the
+   * expected sink name.  #handleSubscribeLine watches for 'Event new on sink'
+   * lines and — as soon as the bluez sink appears in `pactl list sinks short`
+   * — switches immediately and cancels the fallback.
+   *
+   * A fallback timeout (default 15 s, configurable via pactl.btSinkTimeoutMs)
+   * fires if PipeWire never emits the new-sink event (e.g. on slower hardware
+   * or when subscribe restarts mid-negotiation).
+   */
+  onBtDeviceConnected({ address }) {
+    // A new connection supersedes any pending speakers-restore from a disconnect.
+    clearTimeout(this.#disconnectDebounce);
+    this.#disconnectDebounce = null;
+    // Cancel any leftover pending switch from a previous connect cycle.
+    this.#cancelPendingBtSink();
+
+    const sink      = btSinkName(address);
+    const timeoutMs = config.has('pactl.btSinkTimeoutMs')
+      ? config.get('pactl.btSinkTimeoutMs')
+      : 15_000;
+
+    log.info(`BT device connected (${address}), waiting for sink ${sink}`);
+    this.#pendingBtSink = sink;
+
+    // Fallback: if the sink-new event never arrives, try switching anyway.
+    this.#pendingBtSinkTimeout = setTimeout(async () => {
+      if (this.#pendingBtSink !== sink) return; // already handled
+      log.warn(`sink ${sink} did not appear within ${timeoutMs}ms, switching anyway`);
+      await this.#switchToBtSink(sink);
+    }, timeoutMs);
+  }
+
+  // -------------------------------------------------------------------------
+  // BT device disconnected — debounced restore of speakers sink
+  // -------------------------------------------------------------------------
+
+  /**
+   * Called when a BT device disconnects.  A short debounce (default 3 s,
+   * configurable via pactl.btDisconnectDebounceMs) avoids flipping the sink
+   * back during transient BlueZ reconnect attempts.
+   */
+  onBtDeviceDisconnected() {
+    // A new connect event arriving before the debounce fires will cancel this.
+    clearTimeout(this.#disconnectDebounce);
+
+    const debounceMs = config.has('pactl.btDisconnectDebounceMs')
+      ? config.get('pactl.btDisconnectDebounceMs')
+      : 3_000;
+
+    log.info(`BT device disconnected, will restore speakers sink in ${debounceMs}ms`);
+
+    this.#disconnectDebounce = setTimeout(async () => {
+      const defaultSink = config.get('pactl.defaultSink');
+      try {
+        await setDefaultSink(defaultSink);
+        this.emit(PactlEvents.DEFAULT_SINK_CHANGED, {
+          sinkName: defaultSink,
+          sinkType: 'speakers',
+        });
+      } catch (err) {
+        log.error(`failed to restore speakers sink: ${err.message}`);
+      }
+    }, debounceMs);
+  }
+
+  // -------------------------------------------------------------------------
+  // Internal: perform the actual BT sink switch
+  // -------------------------------------------------------------------------
+
+  async #switchToBtSink(sink) {
+    this.#pendingBtSink = null;
+    clearTimeout(this.#pendingBtSinkTimeout);
+    this.#pendingBtSinkTimeout = null;
+    try {
+      await setDefaultSink(sink);
+      this.emit(PactlEvents.DEFAULT_SINK_CHANGED, { sinkName: sink, sinkType: 'bt' });
+    } catch (err) {
+      log.error(`failed to switch to BT sink ${sink}: ${err.message}`);
+    }
+  }
+
+  #cancelPendingBtSink() {
+    this.#pendingBtSink = null;
+    clearTimeout(this.#pendingBtSinkTimeout);
+    this.#pendingBtSinkTimeout = null;
+  }
+
+  // -------------------------------------------------------------------------
   // Line parser
   // -------------------------------------------------------------------------
 
   /**
    * pactl subscribe emits lines like:
    *   Event 'change' on sink #0
-   *   Event 'change' on server #0       ← default sink change
-   *   Event 'new' on sink-input #3
-   *
-   * We care about sink 'change' and server 'change' (which signals a
-   * default-sink switch and will also be followed by a sink 'change').
+   *   Event 'new'    on sink #3          ← new sink registered (e.g. BT A2DP)
+   *   Event 'remove' on sink #3          ← sink unregistered
+   *   Event 'change' on server #0        ← default sink changed
+   *   Event 'new'    on sink-input #3    ← NOT a sink, ignore
    */
   #volumeDebounceTimer = null;
 
   async #handleSubscribeLine(line) {
     if (!line) return;
-    // console.log(`pactl event: ${line}`);
 
+    const isSinkNew    = /Event 'new' on sink #/.test(line);
     const isSinkChange = /Event 'change' on sink #/.test(line);
-    const isServerChange = /Event 'change' on server #/.test(line);
+    const isServerChg  = /Event 'change' on server #/.test(line);
 
-    if (!isSinkChange && !isServerChange) return;
-
-    if (isServerChange) {
-      // no debounce needed — default sink changes are infrequent
+    // ── New sink appeared — check if it's the BT sink we are waiting for ──
+    if (isSinkNew && this.#pendingBtSink) {
       try {
-        const sinkName = (await pactlRun('get-default-sink')).trim();
-        const defaultSink = {
-          sinkName: sinkName,
-          sinkType: sinkType(sinkName)
-        };
-        // console.log(defaultSink.sinkType);
+        // `pactl list sinks short` outputs tab-separated lines:
+        //   <index>\t<name>\t<module>\t<sample-spec>\t<state>
+        const raw   = await pactlRun('list', 'sinks', 'short');
+        const names = raw.split('\n').map(l => l.split('\t')[1]).filter(Boolean);
+        if (names.includes(this.#pendingBtSink)) {
+          log.info(`sink ${this.#pendingBtSink} appeared in PipeWire, switching now`);
+          await this.#switchToBtSink(this.#pendingBtSink);
+        }
+      } catch (err) {
+        log.error(`pactl watcher: failed to list sinks — ${err.message}`);
+      }
+      return;
+    }
+
+    // ── Default sink changed (server event) ───────────────────────────────
+    if (isServerChg) {
+      try {
+        const sinkName   = (await pactlRun('get-default-sink')).trim();
+        const defaultSink = { sinkName, sinkType: sinkType(sinkName) };
         this.emit(PactlEvents.DEFAULT_SINK_CHANGED, defaultSink);
         log.info(`default_sink_changed → ${JSON.stringify(defaultSink)}`);
       } catch (err) {
@@ -254,17 +357,19 @@ class PactlService extends EventEmitter {
       return;
     }
 
-    // isSinkChange — debounce the volumeGet read
-    clearTimeout(this.#volumeDebounceTimer);
-    this.#volumeDebounceTimer = setTimeout(async () => {
-      try {
-        const vol = await volumeGet();
-        this.emit(PactlEvents.VOLUME_CHANGED, vol);
-        log.info(`volume_changed → ${JSON.stringify(vol)}`);
-      } catch (err) {
-        log.error(`pactl watcher: failed to read volume — ${err.message}`);
-      }
-    }, 300);
+    // ── Sink volume/state changed — debounce and emit ─────────────────────
+    if (isSinkChange) {
+      clearTimeout(this.#volumeDebounceTimer);
+      this.#volumeDebounceTimer = setTimeout(async () => {
+        try {
+          const vol = await volumeGet();
+          this.emit(PactlEvents.VOLUME_CHANGED, vol);
+          log.info(`volume_changed → ${JSON.stringify(vol)}`);
+        } catch (err) {
+          log.error(`pactl watcher: failed to read volume — ${err.message}`);
+        }
+      }, 300);
+    }
   }
 }
 
@@ -274,8 +379,15 @@ class PactlService extends EventEmitter {
 
 const pactlService = new PactlService();
 
-setDefaultSink(config.get('pactl.defaultSink'));
+btService.on(btEvents.DEVICE_CONNECTED,    ({ address }) => {
+  pactlService.onBtDeviceConnected({ address });
+});
 
+btService.on(btEvents.DEVICE_DISCONNECTED, () => {
+  pactlService.onBtDeviceDisconnected();
+});
+
+setDefaultSink(config.get('pactl.defaultSink'));
 
 export default {
   btSinkName,
@@ -287,7 +399,7 @@ export default {
   setDefaultSink,
   getDefaultSink,
   startWatcher: () => pactlService.startWatcher(),
-  stopWatcher: () => pactlService.stopWatcher(),
+  stopWatcher:  () => pactlService.stopWatcher(),
 };
 
 // named export for SSE route to subscribe
