@@ -268,15 +268,13 @@
       if (current === 'Speakers')
         newOutput = 'Bluetooth';
       setOutput(newOutput);
+      updateSpeakers();
+      renderBT();
       try {
         let cfg = {};
         cfg = await readCfg();
         cfg.output = newOutput;
         saveCfg(cfg);
-        if (newOutput === 'Bluetooth')
-          updateBT();
-        else
-          updateSpeakers();
       }
       catch (err) { alert(err.message) }
     }
@@ -534,90 +532,104 @@
         .then(res => res.json())
         .then(data => {
           player.bt = data;
-          console.log('getBtStatus', player.bt);
         })
     }
 
-    const updateBTctrlPower = (val = {}) => {
-      if (Object.keys(val).length > 0) {
-        console.log('before', player.bt);
-        console.log('updateBTctrlPower - updating with val', val);
-        player.bt.controllers = player.bt.controllers.map(item => {
-          item.Address === val.Address
-            ? { ...item, Powered: val.Powered } : item
-        });
-        // if (player.bt.selectedCtrl.Address === val.Address)
-        //   player.bt.selectedCtrl.Powered = val.Powered;
-      }
-      console.log('after', player.bt);
-      if (getOutput() !== 'Bluetooth') return;
-      let ctrl = player.bt.selectedCtrl;
-      // update the switch status
-      document.getElementById('outputSwitch').innerHTML = (ctrl.Powered === 'yes' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
-    }
+    // ── state appliers (always run, no DOM touches) ──────────────────────────
 
-    const updateBTdevices = (val = {}) => {
-      console.log('updateBTdevices', val);
-      if (Object.keys(val).length > 0) {
-        let { type, ...devInfo } = val;
-        if (val.type === 'bt_device_found') {
-          if (!player.bt.devices.some(dev => dev.Address === val.Address))
-            player.bt.devices.push(devInfo);
-        } else if (val.type === 'bt_device_removed') {
-          player.bt.devices = player.bt.devices.filter(dev => dev.Address !== val.Address);
-        }
-      }
-      if (getOutput() !== 'Bluetooth' ||
-        Object.keys(player.bt.selectedCtrl).length === 0 ||
-        player.bt.selectedCtrl.Powered === 'no' ||
-        player.bt.selectedCtrl.ConnectedDevice !== null ||
-        Object.keys(player.bt.devices).length === 0) {
-        closeBtDevMod();
-        return;
-      }
-      let tmpList = "";
-      for (let [idx, dev] of player.bt.devices.entries()) {
-        tmpList += `<div class="justify"><span class="pointer" onclick="connectDev(${idx})">${dev.Name}</span><span class="right"><i class="fa-regular fa-trash-can pointer" onclick="deleteDev(${idx})"></i></span></div>`;
-      }
-      let btDevList = document.getElementById('btDevList');
-      btDevList.innerHTML = tmpList;
-      openBtDevMod();
-    }
+    const applyBTctrlPower = ({ address, powered }) => {
+      player.bt.controllers = player.bt.controllers.map(c =>
+        c.Address === address ? { ...c, Powered: powered } : c
+      );
+      if (player.bt.selectedCtrl?.Address === address)
+        player.bt.selectedCtrl = { ...player.bt.selectedCtrl, Powered: powered };
+    };
 
-    const updateBTdesc = () => {
-      if (player.bt.selectedCtrl.ConnectedDevice) {
-        let connected = player.bt.selectedCtrl.ConnectedDevice;
-        let batLevStr = '--';
-        let batIco = 'quarter';
-        if (connected.battery == '--') {
-          batIco = 'full';
-        } else {
-          if (connected.hasOwnProperty('battery')) {
-            batLevStr = connected.battery;
-            let batLev = Number(batLevStr.split('%')[0]);
-            if (batLev > 80)
-              batIco = 'full';
-            else if (batLev > 30)
-              batIco = 'half';
-          }
-        }
-        btDevName = `<span style="font-size: medium">${connected.Name}<br><i class="fa-regular fa-battery-${batIco}"></i>&nbsp&nbsp${batLevStr}</span>`;
-      } else
+    const applyBTdeviceFound = ({ address, name }) => {
+      if (!player.bt.devices.some(d => d.Address === address))
+        player.bt.devices.push({ Address: address, Name: name });
+    };
+
+    const applyBTdeviceConnected = ({ address, name }) => {
+      const dev = player.bt.devices.find(d => d.Address === address)
+        ?? { Address: address, Name: name };
+      if (player.bt.selectedCtrl)
+        player.bt.selectedCtrl.ConnectedDevice = dev;
+    };
+
+    const applyBTdeviceDisconnected = ({ address }) => {
+      if (player.bt.selectedCtrl?.ConnectedDevice?.Address === address)
+        player.bt.selectedCtrl.ConnectedDevice = null;
+    };
+
+    const applyBTdeviceRemoved = ({ address }) => {
+      player.bt.devices = player.bt.devices.filter(d => d.Address !== address);
+      if (player.bt.selectedCtrl?.ConnectedDevice?.Address === address)
+        player.bt.selectedCtrl.ConnectedDevice = null;
+    };
+
+    const applyBTdeviceBatteryUpdate = ({ address, battery }) => {
+      if (player.bt.selectedCtrl?.ConnectedDevice?.Address === address)
+        player.bt.selectedCtrl.ConnectedDevice.battery = battery;
+    };
+
+    // ── renderers (only touch DOM, read from player.bt) ──────────────────────
+
+    const renderBTdesc = () => {
+      const connected = player.bt.selectedCtrl?.ConnectedDevice;
+      if (connected) {
+        const batLev = parseInt(connected.battery);
+        const batIco = !connected.battery ? 'quarter'
+          : batLev > 80 ? 'full'
+            : batLev > 30 ? 'half' : 'quarter';
+        const batStr = connected.battery ?? '--';
+        btDevName = `<span style="font-size:medium">${connected.Name}<br>
+                     <i class="fa-regular fa-battery-${batIco}"></i>&nbsp;${batStr}</span>`;
+      } else {
         btDevName = btDevDefault;
+      }
       if (getOutput() !== 'Speakers') {
         document.getElementById('outSel').innerHTML = btDevName;
         document.getElementById('outSelI').className = 'fa-regular fa-headphones';
       }
-    }
+    };
 
-    const updateBT = () => {
-      // if (Object.keys(val).length > 0) player.bt = { ...player.bt, ...val };
-      if (getOutput() !== 'Bluetooth') return;
-      updateBTctrlPower();
-      updateBTdevices();
-      updateBTdesc();
-    }
+    const renderBTctrlPower = () => {
+      if (getOutput() === 'Speakers') return;
+      const powered = player.bt.selectedCtrl?.Powered === 'yes';
+      document.getElementById('outputSwitch').innerHTML = powered
+        ? '<i class="fa-solid fa-toggle-on fa-xl"></i>'
+        : '<i class="fa-solid fa-toggle-off fa-xl"></i>';
+    };
 
+    const renderBTdevices = () => {
+      const ctrl = player.bt.selectedCtrl;
+      if (getOutput() === 'Speakers'
+        || ctrl?.Powered === 'no'
+        || ctrl?.ConnectedDevice !== null
+        || player.bt.devices.length === 0) {
+        closeBtDevMod();
+        return;
+      }
+      const html = player.bt.devices.map((dev, idx) =>
+        `<div class="justify">
+           <span class="pointer" onclick="connectDev(${idx})">${dev.Name}</span>
+           <span class="right">
+             <i class="fa-regular fa-trash-can pointer" onclick="deleteDev(${idx})"></i>
+           </span>
+         </div>`
+      ).join('');
+      document.getElementById('btDevList').innerHTML = html;
+      openBtDevMod();
+    };
+
+    const renderBT = () => {
+      // DEBUG
+      // console.log('renderBT', player.bt);
+      renderBTctrlPower();
+      renderBTdevices();
+      renderBTdesc();
+    };
     // VOLUME
 
     const updateVolume = (vol) => {
@@ -1531,62 +1543,69 @@
     const initSSE = () => {
       const es = new EventSource('/events');
 
-      es.onmessage = (e) => {
+      es.onmessage = async (e) => {
         const event = JSON.parse(e.data);
-        console.log('Received SSE event:', event); // Debug log for received events
+        // DEBUG
+        console.log('Received event:', event);
         switch (event.type) {
+
           case 'connected':
-            console.log('SSE connected');
-            getPactlStatus();
+            console.info('SSE connected, fetching initial status...');
+            await getPactlStatus();
+            await getSpeakerStatus();
+            updateSpeakers();
+            await getBtStatus();
+            renderBT();
+            await getMpdStatus();
+            updateMpdPlayer();
+            loadQueue();
             break;
-          // PACTL
+
           case 'volume_changed':
             updateVolume(event.data);
             break;
           case 'default_sink_changed':
+            player.pactl = event.data;
             setOutput(event.data.type === 'speakers' ? 'Speakers' : 'Bluetooth');
             break;
-          // SPEAKERS
+
           case 'speakers_powered_on':
-            updateSpeakers(event.data);
-            break;
           case 'speakers_powered_off':
             updateSpeakers(event.data);
             break;
-          // BLUETOOTH
-          case 'bt_controller_powered_on':   // { address }
-            updateBTctrlPower({ Address: event.data.address, Powered: "yes" });
-            updateBTdevices();
+
+          case 'bt_controller_powered_on':
+            applyBTctrlPower({ address: event.data.address, powered: 'yes' });
+            renderBT();
             break;
-          case 'bt_controller_powered_off':  // { address }
-            updateBTctrlPower({ Address: event.data.address, Powered: "no" });
-            closeBtDevMod();
+          case 'bt_controller_powered_off':
+            applyBTctrlPower({ address: event.data.address, powered: 'no' });
+            renderBT();
             break;
-          case 'bt_device_found':             // { address, name }
-            updateBTdevices({ type: event.type, Address: event.data.address, Name: event.data.name });
+          case 'bt_device_found':
+            applyBTdeviceFound({ address: event.data.address, name: event.data.name });
+            renderBTdevices();
             break;
-          case 'bt_device_connected':         // { address, name }
-            //
-            closeBtDevMod();
+          case 'bt_device_connected':
+            applyBTdeviceConnected({ address: event.data.address, name: event.data.name });
+            renderBT();
             break;
-          case 'bt_device_disconnected':      // { address }
-            //
-            updateBTdevices();
+          case 'bt_device_disconnected':
+            applyBTdeviceDisconnected({ address: event.data.address });
+            renderBT();
             break;
-          case 'bt_device_removed':           // { address }
-            updateBTdevices({ type: event.type, Address: event.data.address });
+          case 'bt_device_removed':
+            applyBTdeviceRemoved({ address: event.data.address });
+            renderBTdevices();
             break;
-          case 'bt_device_battery_changed':  // { address, battery }
+          case 'bt_battery_changed':
+            applyBTdeviceBatteryUpdate({ address: event.data.address, battery: event.data.battery });
+            renderBTdesc();
             break;
         }
       };
 
-      es.onerror = (e) => {
-        // EventSource reconnects automatically — no action needed
-        // but worth logging for debugging
-        console.warn('SSE connection lost, browser will retry');
-      };
-
+      es.onerror = () => console.warn('SSE lost, browser will retry');
       return es;
     };
 
@@ -1602,22 +1621,10 @@
 
     async function startup() {
       loadSpinner();
-      let output = 'Speakers';
-      let cfg = {};
-      cfg = await readCfg();
-      if (cfg.output)
-        output = cfg.output;
-      initSSE();
-      await getPactlStatus();
-      await getSpeakerStatus();
-      await updateSpeakers();
-      await getBtStatus();
-      await updateBT();
-      await getMpdStatus();
-      await updateMpdPlayer();
-
+      const cfg = await readCfg();
+      if (cfg.output) setOutput(cfg.output);   // restore UI pref immediately
       initEventListeners();
-      loadQueue();
+      initSSE();                                // hydration happens inside 'connected'
       unloadSpinner();
     }
 

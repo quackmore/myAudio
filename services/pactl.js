@@ -238,7 +238,7 @@ class PactlService extends EventEmitter {
     const sink      = btSinkName(address);
     const timeoutMs = config.has('pactl.btSinkTimeoutMs')
       ? config.get('pactl.btSinkTimeoutMs')
-      : 15_000;
+      : 15000;
 
     log.info(`BT device connected (${address}), waiting for sink ${sink}`);
     this.#pendingBtSink = sink;
@@ -266,7 +266,7 @@ class PactlService extends EventEmitter {
 
     const debounceMs = config.has('pactl.btDisconnectDebounceMs')
       ? config.get('pactl.btDisconnectDebounceMs')
-      : 3_000;
+      : 3000;
 
     log.info(`BT device disconnected, will restore speakers sink in ${debounceMs}ms`);
 
@@ -274,10 +274,10 @@ class PactlService extends EventEmitter {
       const defaultSink = config.get('pactl.defaultSink');
       try {
         await setDefaultSink(defaultSink);
-        this.emit(PactlEvents.DEFAULT_SINK_CHANGED, {
-          sinkName: defaultSink,
-          sinkType: 'speakers',
-        });
+        // this.emit(PactlEvents.DEFAULT_SINK_CHANGED, {
+        //   sinkName: defaultSink,
+        //   sinkType: 'speakers',
+        // });
       } catch (err) {
         log.error(`failed to restore speakers sink: ${err.message}`);
       }
@@ -294,7 +294,7 @@ class PactlService extends EventEmitter {
     this.#pendingBtSinkTimeout = null;
     try {
       await setDefaultSink(sink);
-      this.emit(PactlEvents.DEFAULT_SINK_CHANGED, { sinkName: sink, sinkType: 'bt' });
+      // this.emit(PactlEvents.DEFAULT_SINK_CHANGED, { sinkName: sink, sinkType: 'bt' });
     } catch (err) {
       log.error(`failed to switch to BT sink ${sink}: ${err.message}`);
     }

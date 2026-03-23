@@ -324,6 +324,7 @@ class BtService extends EventEmitter {
         break;
       }
       case 'Connected': {
+        if (dev.Connected === val) break; // no change
         dev.Connected = val;
         if (val === 'yes' && this.#selectedCtrl) {
           this.#selectedCtrl.ConnectedDevice = dev;
