@@ -1,4 +1,5 @@
 import log from './logger.js';
+import config from 'config';
 import cfgfile from './cfgfile.js';
 import stripAnsi from 'strip-ansi';
 import EventEmitter from 'events';
@@ -9,12 +10,12 @@ import { spawn } from 'child_process';
 // ---------------------------------------------------------------------------
 
 const btEvents = {
-  CONTROLLER_POWERED_ON:  'controller_powered_on',   // { address }
+  CONTROLLER_POWERED_ON: 'controller_powered_on',   // { address }
   CONTROLLER_POWERED_OFF: 'controller_powered_off',  // { address }
-  DEVICE_FOUND:           'device_found',             // { address, name }
-  DEVICE_CONNECTED:       'device_connected',         // { address, name }
-  DEVICE_DISCONNECTED:    'device_disconnected',      // { address }
-  DEVICE_REMOVED:         'device_removed',           // { address }
+  DEVICE_FOUND: 'device_found',             // { address, name }
+  DEVICE_CONNECTED: 'device_connected',         // { address, name }
+  DEVICE_DISCONNECTED: 'device_disconnected',      // { address }
+  DEVICE_REMOVED: 'device_removed',           // { address }
   DEVICE_BATTERY_CHANGED: 'device_battery_changed',  // { address, battery }
 };
 
@@ -26,24 +27,24 @@ class BtService extends EventEmitter {
 
   // ── private state ─────────────────────────────────────────────────────────
 
-  #proc             = null;   // bluetoothctl child process
-  #restarting       = false;  // false = intentional stop
-  #logBuffer        = [];     // rolling log ring
-  #logMaxLen        = 100;
+  #proc = null;   // bluetoothctl child process
+  #restarting = false;  // false = intentional stop
+  #logBuffer = [];     // rolling log ring
+  #logMaxLen = 100;
 
   // parsed BT world
-  #controllers      = [];     // [{ Address, Name, Powered, Pairable, Discoverable, Discovering }]
-  #selectedCtrl     = null;   // reference into #controllers
-  #devices          = [];     // [{ Address, Name, Icon, Paired, Trusted, Connected, battery? }]
+  #controllers = [];     // [{ Address, Name, Powered, Pairable, Discoverable, Discovering }]
+  #selectedCtrl = null;   // reference into #controllers
+  #devices = [];     // [{ Address, Name, Icon, Paired, Trusted, Connected, battery? }]
 
   // per-session parsing context
-  #pendingCommand   = null;   // command whose response we are currently reading
-  #lastCtrlAddress  = null;   // address context for multi-line controller output
-  #lastDevAddress   = null;   // address context for multi-line device output
+  #pendingCommand = null;   // command whose response we are currently reading
+  #lastCtrlAddress = null;   // address context for multi-line controller output
+  #lastDevAddress = null;   // address context for multi-line device output
 
   // battery polling
-  #batteryTimer     = null;   // setInterval handle, active only while a device is connected
-  #batteryPollMs    = 60_000; // poll every 60 s
+  #batteryTimer = null;   // setInterval handle, active only while a device is connected
+  #batteryPollMs = 60000; // poll every 60 s
 
   // ── public lifecycle ──────────────────────────────────────────────────────
 
@@ -80,9 +81,9 @@ class BtService extends EventEmitter {
   /** Snapshot of current BT state (used by /bt/status route). */
   status() {
     return {
-      controllers:  this.#controllers,
+      controllers: this.#controllers,
       selectedCtrl: this.#selectedCtrl,
-      devices:      this.#devices,
+      devices: this.#devices,
     };
   }
 
@@ -98,12 +99,12 @@ class BtService extends EventEmitter {
     this.#proc = proc;
 
     // reset world state for a fresh session
-    this.#controllers    = [];
-    this.#selectedCtrl   = null;
-    this.#devices        = [];
+    this.#controllers = [];
+    this.#selectedCtrl = null;
+    this.#devices = [];
     this.#pendingCommand = null;
     this.#lastCtrlAddress = null;
-    this.#lastDevAddress  = null;
+    this.#lastDevAddress = null;
 
     proc.stdout.on('data', (data) => {
       const cleaned = stripAnsi(data.toString()).replace(/\u0001|\u0002/g, '');
@@ -162,9 +163,9 @@ class BtService extends EventEmitter {
     this.#log(line);
 
     // ── async event lines ──────────────────────────────────────────────────
-    if (line.startsWith('[NEW]'))    { this.#handleNew(line);    return; }
-    if (line.startsWith('[CHG]'))    { this.#handleChg(line);    return; }
-    if (line.startsWith('[DEL]'))    { this.#handleDel(line);    return; }
+    if (line.startsWith('[NEW]')) { this.#handleNew(line); return; }
+    if (line.startsWith('[CHG]')) { this.#handleChg(line); return; }
+    if (line.startsWith('[DEL]')) { this.#handleDel(line); return; }
 
     // ── command echo lines — set parsing context ───────────────────────────
     // bluetoothctl echoes the command back before its response
@@ -201,7 +202,7 @@ class BtService extends EventEmitter {
     if (!line.includes('Device')) return;
     const parts = line.split(' ');
     const address = parts[2];
-    const name    = parts.slice(3).join(' ');
+    const name = parts.slice(3).join(' ');
     if (!this.#deviceByAddress(address)) {
       this.#devices.push({ Address: address, Name: name });
       log.info(`device found: ${address} (${name})`);
@@ -215,9 +216,9 @@ class BtService extends EventEmitter {
     // [CHG] Controller AA:BB:CC:DD:EE:FF Property: value
     // [CHG] Device     AA:BB:CC:DD:EE:FF Property: value
     const parts = line.split(' ');
-    const kind    = parts[1];   // 'Controller' or 'Device'
+    const kind = parts[1];   // 'Controller' or 'Device'
     const address = parts[2];
-    const rest    = parts.slice(3).join(' ');  // "Property: value"
+    const rest = parts.slice(3).join(' ');  // "Property: value"
 
     if (kind === 'Controller') {
       this.#lastCtrlAddress = address;
@@ -243,7 +244,7 @@ class BtService extends EventEmitter {
   #applyControllerLine(line) {
     // "Controller AA:BB:CC:DD:EE:FF [default]"  — introduces a controller
     if (line.startsWith('Controller')) {
-      const parts   = line.split(' ');
+      const parts = line.split(' ');
       const address = parts[1];
       this.#lastCtrlAddress = address;
       if (!this.#controllerByAddress(address)) {
@@ -262,10 +263,10 @@ class BtService extends EventEmitter {
     const val = valParts.join(':').trim();
 
     switch (key.trim()) {
-      case 'Name':        ctrl.Name          = val; break;
-      case 'Pairable':    ctrl.Pairable      = val; break;
-      case 'Discovering': ctrl.Discovering   = val; break;
-      case 'Discoverable':ctrl.Discoverable  = val; break;
+      case 'Name': ctrl.Name = val; break;
+      case 'Pairable': ctrl.Pairable = val; break;
+      case 'Discovering': ctrl.Discovering = val; break;
+      case 'Discoverable': ctrl.Discoverable = val; break;
       case 'Powered': {
         const prev = ctrl.Powered;
         ctrl.Powered = val;
@@ -306,12 +307,12 @@ class BtService extends EventEmitter {
     const val = valParts.join(':').trim();
 
     switch (key.trim()) {
-      case 'Name':    if (!line.includes('is nil')) dev.Name    = val; break;
-      case 'Icon':    dev.Icon    = val; break;
+      case 'Name': if (!line.includes('is nil')) dev.Name = val; break;
+      case 'Icon': dev.Icon = val; break;
       case 'Blocked': dev.Blocked = val; break;
-      case 'Paired':  dev.Paired  = val; break;
+      case 'Paired': dev.Paired = val; break;
       case 'Trusted': dev.Trusted = val; break;
-      case 'RSSI':    dev.RSSI    = val; break;
+      case 'RSSI': dev.RSSI = val; break;
       case 'Battery Percentage': {
         // val is e.g. "0x50 (80)" — extract the decimal part
         const match = val.match(/\((\d+)\)/);
@@ -346,9 +347,9 @@ class BtService extends EventEmitter {
   /** Parse a "devices" command response line: "Device AA:BB:CC:DD Friendly Name" */
   #applyDevicesLine(line) {
     if (!line.startsWith('Device')) return;
-    const parts   = line.split(' ');
+    const parts = line.split(' ');
     const address = parts[1];
-    const name    = parts.slice(2).join(' ');
+    const name = parts.slice(2).join(' ');
     if (!this.#deviceByAddress(address)) {
       this.#devices.push({ Address: address, Name: name });
     }
@@ -379,13 +380,25 @@ class BtService extends EventEmitter {
    * catches devices that don't push proactively.
    */
   #startBatteryTimer(address) {
-    this.#stopBatteryTimer(); // clear any leftover timer
+    this.#stopBatteryTimer();
     log.info(`battery poll started for ${address} (every ${this.#batteryPollMs / 1000}s)`);
-    this.#batteryTimer = setInterval(() => {
+    const batteryFirstPollMs = config.has('bt.btBatteryFirstPollMs')
+      ? config.get('bt.btBatteryFirstPollMs')
+      : 4000; // 4s is usually enough for BlueZ to negotiate the battery service
+
+    // First read: short delay to let BlueZ expose the battery interface
+    const firstRead = setTimeout(() => {
       if (!this.#proc) return;
-      log.debug?.(`battery poll: info ${address}`);
       this.#sendCmd(`info ${address}`);
-    }, this.#batteryPollMs);
+      // Then settle into the regular cadence
+      this.#batteryTimer = setInterval(() => {
+        if (!this.#proc) return;
+        this.#sendCmd(`info ${address}`);
+      }, this.#batteryPollMs);
+    }, batteryFirstPollMs);
+
+    // Store the firstRead handle so #stopBatteryTimer can cancel it too
+    this.#batteryTimer = firstRead;
   }
 
   #stopBatteryTimer() {

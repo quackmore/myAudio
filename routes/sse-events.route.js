@@ -18,7 +18,7 @@ router.get('/', (req, res) => {
   res.setHeader('X-Accel-Buffering', 'no');
 
   const sendEvent = (type, data) => {
-    console.debug(`Sending event: ${type}`, data);
+    log.debug(`Sending event: ${type}`, data);
     res.write('data: ' + JSON.stringify({ type, data, timestamp: Date.now() }) + '\n\n');
   };
 

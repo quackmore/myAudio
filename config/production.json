@@ -25,5 +25,8 @@
         "contactRelay": 2,
         "card": "2",
         "volumeCtrl": "PCM"
+    },
+    "bt": {
+        "btBatteryFirstPollMs": 2000
     }
 }
