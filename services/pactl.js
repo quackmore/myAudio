@@ -73,11 +73,15 @@ const parseMute = (raw) => (raw.includes('yes') ? 'yes' : 'no');
  * Returns: { volume, volumeLeft, volumeRight, mute }
  */
 const volumeGet = async (sink = '@DEFAULT_SINK@') => {
+  let sinkName = sink;
+  if (sink === '@DEFAULT_SINK@') {
+    sinkName = (await pactlRun('get-default-sink')).trim();
+  }
   const [volRaw, muteRaw] = await Promise.all([
     pactlRun('get-sink-volume', sink),
     pactlRun('get-sink-mute', sink),
   ]);
-  return { ...parseVolume(volRaw), mute: parseMute(muteRaw) };
+  return { sink: sinkName, ...parseVolume(volRaw), mute: parseMute(muteRaw) };
 };
 
 /**
@@ -428,9 +432,9 @@ class PactlService extends EventEmitter {
   async #handleSubscribeLine(line) {
     if (!line) return;
 
-    const isSinkNew    = /Event 'new' on sink #/.test(line);
+    const isSinkNew = /Event 'new' on sink #/.test(line);
     const isSinkChange = /Event 'change' on sink #/.test(line);
-    const isServerChg  = /Event 'change' on server #/.test(line);
+    const isServerChg = /Event 'change' on server #/.test(line);
 
     // ── New sink appeared — check if it's the BT sink we are waiting for ──
     if (isSinkNew && this.#pendingBtSink) {
@@ -493,6 +497,16 @@ class PactlService extends EventEmitter {
       }, 300);
     }
   }
+
+  async startup() {
+    console.log('Delayed pactl startup...');
+    const sinkName = (await pactlRun('get-default-sink')).trim();
+    const defaultSink = { sinkName, sinkType: sinkType(sinkName) };
+    console.log('Emitting default sink on startup:', defaultSink);
+    this.emit(PactlEvents.DEFAULT_SINK_CHANGED, defaultSink);
+    const vol = await volumeGet(defaultSink.sinkName);
+    this.emit(PactlEvents.VOLUME_CHANGED, vol);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -509,7 +523,14 @@ btService.on(btEvents.DEVICE_DISCONNECTED, () => {
   pactlService.onBtDeviceDisconnected();
 });
 
-setDefaultSink(config.get('pactl.defaultSink'));
+// At startup check for the default sink and send the events for the sink and its volume
+// but wait for sse going up first
+
+setTimeout(pactlService.startup.bind(pactlService), 2000);
+
+// ---------------------------------------------------------------------------
+// Exports
+// ---------------------------------------------------------------------------
 
 export default {
   btSinkName,
@@ -521,7 +542,7 @@ export default {
   setDefaultSink,
   getDefaultSink,
   startWatcher: () => pactlService.startWatcher(),
-  stopWatcher:  () => pactlService.stopWatcher(),
+  stopWatcher: () => pactlService.stopWatcher(),
 };
 
 // named export for SSE route to subscribe
