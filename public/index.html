@@ -249,7 +249,7 @@
 
     // OUTPUT
 
-    function setOutput(output) {
+    function renderOutput(output) {
       if (output === 'Speakers') {
         document.getElementById('outSel').innerText = 'Speakers';
         document.getElementById('outSelI').className = 'fa-regular fa-volume-high';
@@ -267,9 +267,10 @@
       let newOutput = 'Speakers';
       if (current === 'Speakers')
         newOutput = 'Bluetooth';
-      setOutput(newOutput);
-      updateSpeakers();
+      renderOutput(newOutput);
+      renderSpeakers();
       renderBT();
+      renderVolume();
       try {
         let cfg = {};
         cfg = await readCfg();
@@ -317,14 +318,18 @@
     player.speakers = {};
     player.speakers.power = null;
 
-    const getSpeakerStatus = () => {
+    const initSpeakerStatus = () => {
       return toutFetch('/speakers/status', 5000)
         .then(res => res.json())
-        .then(data => player.speakers = { ...player.speakers, ...data })
+        .then(data => applySpeakersUpdate(data))
+        .then(() => renderSpeakers())
     }
 
-    const updateSpeakers = (val = {}) => {
-      if (Object.keys(val).length > 0) player.speakers = { ...player.speakers, ...val };
+    const applySpeakersUpdate = (val) => {
+      player.speakers = { ...player.speakers, ...val };
+    }
+
+    const renderSpeakers = () => {
       if (getOutput() !== 'Speakers') return;
       document.getElementById('outputSwitch').innerHTML = (player.speakers.power === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
     }
@@ -527,11 +532,12 @@
       document.getElementById("btDevMod").style.display = "none";
     }
 
-    const getBtStatus = () => {
+    const initBtStatus = () => {
       return toutFetch(`/bt/status`, 5000)
         .then(res => res.json())
         .then(data => {
           player.bt = data;
+          renderBT();
         })
     }
 
@@ -630,9 +636,28 @@
       renderBTdevices();
       renderBTdesc();
     };
-    // VOLUME
 
-    const updateVolume = (vol) => {
+    // PACTL / VOLUME
+
+    player.pactl = {
+      defaultSink: null,
+      volume: [],
+    };
+
+    const applyPactlSinkUpdate = (sink) => {
+      player.pactl.defaultSink = sink;
+    };
+
+    const applyPactlVolumeUpdate = (vol) => {
+      if (!player.pactl.volume.some(d => d.sink === vol.sink))
+        player.pactl.volume.push(vol);
+      else
+        player.pactl.volume = player.pactl.volume.map(d =>
+          d.sink === vol.sink ? { ...d, ...vol } : d
+        );
+    };
+
+    const renderVolumeEnabled = (vol) => {
       document.getElementById('volRange').value = vol.volume.split('%')[0];
       document.getElementById('volRange').disabled = false;
       document.getElementById('volLevel').innerText = vol.volume.split('%')[0];
@@ -641,6 +666,39 @@
       document.getElementById('volMute').innerHTML = vol.mute === 'yes'
         ? '<i class="fa-solid fa-volume-xmark actC"></i>'
         : '<i class="fa-solid fa-volume-high actC"></i>';
+    };
+
+    const renderVolumeDisabled = () => {
+      document.getElementById('volRange').value = 0;
+      document.getElementById('volRange').disabled = true;
+      document.getElementById('volLevel').innerText = 0;
+      document.getElementById('volLeft').innerText = 0;
+      document.getElementById('volRight').innerText = 0;
+      document.getElementById('volMute').innerHTML = '<i class="fa-solid fa-volume-xmark actC"></i>';
+    };
+
+    const renderVolume = () => {
+      if (getOutput() !== 'Speakers') {
+        const connected = player.bt.selectedCtrl?.ConnectedDevice;
+        if (!connected) {
+          renderVolumeDisabled();
+          return;
+        }
+        const addressInSinkName = `${connected.Address.replace(/:/g, '_')}`;
+        const vol = player.pactl.volume.find(v => v.sink.includes(addressInSinkName));
+        if (!vol) {
+          renderVolumeDisabled();
+          return;
+        }
+        renderVolumeEnabled(vol);
+      } else {
+        const vol = player.pactl.volume.find(v => v.type === 'speakers');
+        if (!vol) {
+          renderVolumeDisabled();
+          return;
+        }
+        renderVolumeEnabled(vol);
+      }
     };
 
     const volumeSet = async () => {
@@ -1551,36 +1609,40 @@
 
           case 'connected':
             console.info('SSE connected, fetching initial status...');
-            await getPactlStatus();
-            await getSpeakerStatus();
-            updateSpeakers();
-            await getBtStatus();
-            renderBT();
+            await initBtStatus();
+            await initSpeakerStatus();
+            await initPactlStatus();
             await getMpdStatus();
             updateMpdPlayer();
             loadQueue();
             break;
 
           case 'volume_changed':
-            updateVolume(event.data);
+            applyPactlVolumeUpdate(event.data);
+            renderVolume();
             break;
+
           case 'default_sink_changed':
-            player.pactl = event.data;
-            setOutput(event.data.type === 'speakers' ? 'Speakers' : 'Bluetooth');
+            applyPactlSinkUpdate(event.data);
+            renderOutput(event.data.type === 'speakers' ? 'Speakers' : 'Bluetooth');
+            renderVolume();
             break;
 
           case 'speakers_powered_on':
           case 'speakers_powered_off':
-            updateSpeakers(event.data);
+            applySpeakersUpdate(event.data);
+            renderVolume();
             break;
 
           case 'bt_controller_powered_on':
             applyBTctrlPower({ address: event.data.address, powered: 'yes' });
             renderBT();
+            renderVolume();
             break;
           case 'bt_controller_powered_off':
             applyBTctrlPower({ address: event.data.address, powered: 'no' });
             renderBT();
+            renderVolume();
             break;
           case 'bt_device_found':
             applyBTdeviceFound({ address: event.data.address, name: event.data.name });
@@ -1593,6 +1655,7 @@
           case 'bt_device_disconnected':
             applyBTdeviceDisconnected({ address: event.data.address });
             renderBT();
+            renderVolume();
             break;
           case 'bt_device_removed':
             applyBTdeviceRemoved({ address: event.data.address });
@@ -1610,19 +1673,21 @@
     };
 
     // STARTUP
-    const getPactlStatus = async () => {
+    const initPactlStatus = async () => {
       return toutFetch('/pactl/status', 5000)
         .then(res => res.json())
         .then(data => {
-          setOutput(data.type === 'speakers' ? 'Speakers' : 'Bluetooth');
-          updateVolume(data);
+          applyPactlSinkUpdate({ sinkName: data.sinkName, syncType: data.type });
+          renderOutput(data.type === 'speakers' ? 'Speakers' : 'Bluetooth');
+          applyPactlVolumeUpdate(data);
+          renderVolume();
         });
     };
 
     async function startup() {
       loadSpinner();
       const cfg = await readCfg();
-      if (cfg.output) setOutput(cfg.output);   // restore UI pref immediately
+      if (cfg.output) renderOutput(cfg.output);   // restore UI pref immediately
       initEventListeners();
       initSSE();                                // hydration happens inside 'connected'
       unloadSpinner();
