@@ -163,14 +163,11 @@ class PactlService extends EventEmitter {
   // When a BT device connects we store the sink name we are waiting for.
   // The subscribe watcher checks each new sink against this value and
   // switches immediately when it appears, cancelling the fallback timeout.
-  #pendingBtSink = null;   // string | null
+  #pendingBtSink = null;          // string | null
   #pendingBtSinkTimeout = null;   // fallback setTimeout handle
 
   // Debounce handle for restoring the speakers sink after disconnect.
   #disconnectDebounce = null;
-
-  // Fixed timer after a BT device connects, used for setting initial volume
-  #justConnectedBTdevice = null;
 
   // Volume debounce for subscribe events
   #volumeDebounceTimer = null;
@@ -178,13 +175,29 @@ class PactlService extends EventEmitter {
   // Save debounce — avoid hammering cfgfile on every +1% nudge
   #volumeSaveTimer = null;
 
-  // Fixed timer after a Default sink change, used for emitting initial 
-  // volume info
-  #justSwitchedDefaultSink = null;
+  // ---------------------------------------------------------------------------
+  // Post-switch settling window
+  //
+  // A single 2s window opened on every default-sink change covers two cases:
+  //
+  //   USB / static sinks: PipeWire emits no volume event (no AVRCP, sink was
+  //     already present). If the window expires without any volume_changed
+  //     event, we read the sink volume and emit it ourselves so the UI updates.
+  //
+  //   BT sinks: PipeWire restores its saved value (~300ms) then AVRCP pushes
+  //     the device's preferred value (~700–1200ms). Both arrive as
+  //     volume_changed events. On each event inside the window we immediately
+  //     restore our saved volume (proactive on switch + reactive on each event)
+  //     to minimise the duration of any volume spike.
+  //
+  // Both cases are bounded by the same real-world question: how long does it
+  // take for PipeWire + AVRCP to finish touching the sink after a switch?
+  // One timer, one tunable constant.
+  // ---------------------------------------------------------------------------
 
-  // Boolean flag to remember volume change events immediately after a 
-  // default sink change,
-  #volumeUpdatedAfterDefaultSinkChange = false;
+  #postSwitchSink = null;           // sink name active during the window, or null
+  #postSwitchTimer = null;          // the 2s timer handle
+  #postSwitchGotVolumeEvent = false; // did any volume_changed arrive in the window?
 
   // -------------------------------------------------------------------------
   // Watcher lifecycle
@@ -199,9 +212,9 @@ class PactlService extends EventEmitter {
     this.#restarting = false;
     clearTimeout(this.#pendingBtSinkTimeout);
     clearTimeout(this.#disconnectDebounce);
-    clearTimeout(this.#justConnectedBTdevice);
     clearTimeout(this.#volumeDebounceTimer);
     clearTimeout(this.#volumeSaveTimer);
+    this.#clearPostSwitchWindow();
 
     if (this.#watcherProc) {
       this.#watcherProc.kill();
@@ -235,6 +248,42 @@ class PactlService extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
+  // Post-switch window helpers
+  // -------------------------------------------------------------------------
+
+  #openPostSwitchWindow(sinkName) {
+    this.#clearPostSwitchWindow();
+    this.#postSwitchSink = sinkName;
+    this.#postSwitchGotVolumeEvent = false;
+
+    const windowMs = config.has('pactl.postSwitchWindowMs')
+      ? config.get('pactl.postSwitchWindowMs')
+      : 2000;
+
+    this.#postSwitchTimer = setTimeout(async () => {
+      const sink = this.#postSwitchSink;
+      // USB / static sink case: no volume event arrived → emit fallback
+      if (!this.#postSwitchGotVolumeEvent) {
+        try {
+          const vol = await volumeGet(sink);
+          log.info(`post-switch fallback volume_changed → ${JSON.stringify(vol)}`);
+          this.emit(PactlEvents.VOLUME_CHANGED, vol);
+        } catch (err) {
+          log.error(`post-switch fallback: failed to read volume — ${err.message}`);
+        }
+      }
+      this.#clearPostSwitchWindow();
+    }, windowMs);
+  }
+
+  #clearPostSwitchWindow() {
+    clearTimeout(this.#postSwitchTimer);
+    this.#postSwitchTimer = null;
+    this.#postSwitchSink = null;
+    this.#postSwitchGotVolumeEvent = false;
+  }
+
+  // -------------------------------------------------------------------------
   // Volume persistence
   // -------------------------------------------------------------------------
 
@@ -261,7 +310,7 @@ class PactlService extends EventEmitter {
 
   /**
    * Restore the saved volume for a sink and apply it via pactl.
-   * Only if a saved value exists for that sink and is different from the current volume.
+   * Only acts if a saved value exists and differs from the current volume.
    * Falls back gracefully if no saved value exists.
    */
   async #restoreVolume(sinkName, currentVolume = null) {
@@ -282,24 +331,8 @@ class PactlService extends EventEmitter {
   // BT device connected — wait for sink to appear, then switch
   // -------------------------------------------------------------------------
 
-  /**
-   * Called when a BT device connects.
-   *
-   * Rather than sleeping a fixed duration, we arm #pendingBtSink with the
-   * expected sink name.  #handleSubscribeLine watches for 'Event new on sink'
-   * lines and — as soon as the bluez sink appears in `pactl list sinks short`
-   * — switches immediately and cancels the fallback.
-   *
-   * A fallback timeout (default 15 s, configurable via pactl.btSinkTimeoutMs)
-   * fires if PipeWire never emits the new-sink event (e.g. on slower hardware
-   * or when subscribe restarts mid-negotiation).
-   */
   async onBtDeviceConnected({ address }) {
     clearTimeout(this.#disconnectDebounce);
-    clearTimeout(this.#justConnectedBTdevice);
-    this.#justConnectedBTdevice = setTimeout(async () => {
-      this.#justConnectedBTdevice = null;
-    }, 2000);
     this.#disconnectDebounce = null;
     this.#cancelPendingBtSink();
 
@@ -336,16 +369,8 @@ class PactlService extends EventEmitter {
   // BT device disconnected — debounced restore of speakers sink
   // -------------------------------------------------------------------------
 
-  /**
-   * Called when a BT device disconnects.  A short debounce (default 3 s,
-   * configurable via pactl.btDisconnectDebounceMs) avoids flipping the sink
-   * back during transient BlueZ reconnect attempts.
-   */
   onBtDeviceDisconnected() {
-    // A new connect event arriving before the debounce fires will cancel this.
     clearTimeout(this.#disconnectDebounce);
-    clearTimeout(this.#justConnectedBTdevice);
-    this.#justConnectedBTdevice = null;
 
     const debounceMs = config.has('pactl.btDisconnectDebounceMs')
       ? config.get('pactl.btDisconnectDebounceMs')
@@ -357,10 +382,6 @@ class PactlService extends EventEmitter {
       const defaultSink = config.get('pactl.defaultSink');
       try {
         await setDefaultSink(defaultSink);
-        // this.emit(PactlEvents.DEFAULT_SINK_CHANGED, {
-        //   sinkName: defaultSink,
-        //   sinkType: 'speakers',
-        // });
       } catch (err) {
         log.error(`failed to restore speakers sink: ${err.message}`);
       }
@@ -372,12 +393,14 @@ class PactlService extends EventEmitter {
   // -------------------------------------------------------------------------
 
   async #switchToBtSink(sink) {
-    this.#pendingBtSink = null;
-    clearTimeout(this.#pendingBtSinkTimeout);
-    this.#pendingBtSinkTimeout = null;
+    this.#cancelPendingBtSink();
     try {
       await setDefaultSink(sink);
-      // this.emit(PactlEvents.DEFAULT_SINK_CHANGED, { sinkName: sink, sinkType: 'bt' });
+      // Proactive restore: apply our saved volume immediately after the switch,
+      // before PipeWire or AVRCP have touched the sink. May lose the race with
+      // AVRCP on slow hardware — the reactive restore in #handleSubscribeLine
+      // catches that case.
+      await this.#restoreVolume(sink);
     } catch (err) {
       log.error(`failed to switch to BT sink ${sink}: ${err.message}`);
     }
@@ -405,15 +428,13 @@ class PactlService extends EventEmitter {
   async #handleSubscribeLine(line) {
     if (!line) return;
 
-    const isSinkNew = /Event 'new' on sink #/.test(line);
+    const isSinkNew    = /Event 'new' on sink #/.test(line);
     const isSinkChange = /Event 'change' on sink #/.test(line);
-    const isServerChg = /Event 'change' on server #/.test(line);
+    const isServerChg  = /Event 'change' on server #/.test(line);
 
     // ── New sink appeared — check if it's the BT sink we are waiting for ──
     if (isSinkNew && this.#pendingBtSink) {
       try {
-        // `pactl list sinks short` outputs tab-separated lines:
-        //   <index>\t<name>\t<module>\t<sample-spec>\t<state>
         const raw = await pactlRun('list', 'sinks', 'short');
         const names = raw.split('\n').map(l => l.split('\t')[1]).filter(Boolean);
         if (names.includes(this.#pendingBtSink)) {
@@ -426,29 +447,23 @@ class PactlService extends EventEmitter {
       return;
     }
 
-    // ── Default sink changed (server event) ───────────────────────────────
+    // ── Default sink changed (server event) ──────────────────────────────
     if (isServerChg) {
       try {
         const sinkName = (await pactlRun('get-default-sink')).trim();
         const defaultSink = { sinkName, sinkType: sinkType(sinkName) };
         this.emit(PactlEvents.DEFAULT_SINK_CHANGED, defaultSink);
         log.info(`default_sink_changed → ${JSON.stringify(defaultSink)}`);
-        this.#volumeUpdatedAfterDefaultSinkChange = false;
-        this.#justSwitchedDefaultSink = setTimeout(async () => {
-          this.#justSwitchedDefaultSink = null;
-          // If no volume change events have come through after 2s, emit one with the current volume.
-          if (!this.#volumeUpdatedAfterDefaultSinkChange) {
-            const currentVolume = await volumeGet(sinkName);
-            this.emit(PactlEvents.VOLUME_CHANGED, currentVolume);
-          }
-        }, 2000);
+        // Open the post-switch window. See the comment block on #postSwitchSink
+        // above for a full explanation of what this window handles.
+        this.#openPostSwitchWindow(sinkName);
       } catch (err) {
         log.error(`pactl watcher: failed to read default sink — ${err.message}`);
       }
       return;
     }
 
-    // ── Sink volume/state changed — debounce and emit ─────────────────────
+    // ── Sink volume / state changed — debounce and emit ───────────────────
     if (isSinkChange) {
       clearTimeout(this.#volumeDebounceTimer);
       this.#volumeDebounceTimer = setTimeout(async () => {
@@ -457,19 +472,21 @@ class PactlService extends EventEmitter {
           const vol = await volumeGet(sinkName);
           this.emit(PactlEvents.VOLUME_CHANGED, vol);
           log.info(`volume_changed → ${JSON.stringify(vol)}`);
-          // if this change came immediately after a BT device connected, 
-          // it might happen that PipeWire fails to apply a default volume
-          // then restore the saved one
-          if (sinkType(sinkName) === 'bt' && this.#justConnectedBTdevice) {
-            await this.#restoreVolume(sinkName);
-          }
-          // persist the new volume for this sink
           this.#scheduleSaveVolume(sinkName, vol.volume);
-          // remember if we've had volume change events after a default sink change, 
-          // so the subscribe watcher can decide whether to emit an initial volume event after switching
-          if (this.#justSwitchedDefaultSink) {
-            this.#volumeUpdatedAfterDefaultSinkChange = true;
+
+          // Inside the post-switch window on a BT sink: PipeWire or AVRCP
+          // just pushed a volume we didn't ask for. Restore our saved value
+          // immediately to keep any spike as short as possible.
+          if (this.#postSwitchSink === sinkName && sinkType(sinkName) === 'bt') {
+            await this.#restoreVolume(sinkName, vol.volume);
           }
+
+          // Mark that at least one volume event arrived in the window,
+          // so the fallback emit at window expiry is suppressed.
+          if (this.#postSwitchSink === sinkName) {
+            this.#postSwitchGotVolumeEvent = true;
+          }
+
         } catch (err) {
           log.error(`pactl watcher: failed to read volume — ${err.message}`);
         }
@@ -504,7 +521,7 @@ export default {
   setDefaultSink,
   getDefaultSink,
   startWatcher: () => pactlService.startWatcher(),
-  stopWatcher: () => pactlService.stopWatcher(),
+  stopWatcher:  () => pactlService.stopWatcher(),
 };
 
 // named export for SSE route to subscribe
