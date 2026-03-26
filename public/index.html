@@ -21,7 +21,7 @@
     <div class="fixedWidth">
       <div class="justify">
         <div class="left">
-          <span class="outSelect actBC" id="outSel" onclick="toggleOutput(this.innerText)"></span>
+          <span class="outSelect actBC" id="outSel" onclick="toggleOutput(this.innerText)">Speakers</span>
           <i id="outSelI"></i>
           <div class="actC" id="outputSwitch" onclick="outputSwitch()"></div>
         </div>
@@ -322,7 +322,6 @@
       return toutFetch('/speakers/status', 5000)
         .then(res => res.json())
         .then(data => applySpeakersUpdate(data))
-        .then(() => renderSpeakers())
     }
 
     const applySpeakersUpdate = (val) => {
@@ -537,7 +536,6 @@
         .then(res => res.json())
         .then(data => {
           player.bt = data;
-          renderBT();
         })
     }
 
@@ -1604,7 +1602,7 @@
       es.onmessage = async (e) => {
         const event = JSON.parse(e.data);
         // DEBUG
-        console.log('Received event:', event);
+        console.debug('Received event:', event);
         switch (event.type) {
 
           case 'connected':
@@ -1612,6 +1610,9 @@
             await initBtStatus();
             await initSpeakerStatus();
             await initPactlStatus();
+            renderSpeakers();
+            renderBT();
+            renderVolume();
             await getMpdStatus();
             updateMpdPlayer();
             loadQueue();
@@ -1624,13 +1625,14 @@
 
           case 'default_sink_changed':
             applyPactlSinkUpdate(event.data);
-            renderOutput(event.data.type === 'speakers' ? 'Speakers' : 'Bluetooth');
+            renderOutput(event.data.syncType === 'speakers' ? 'Speakers' : 'Bluetooth');
             renderVolume();
             break;
 
           case 'speakers_powered_on':
           case 'speakers_powered_off':
             applySpeakersUpdate(event.data);
+            renderSpeakers();
             renderVolume();
             break;
 
@@ -1677,17 +1679,15 @@
       return toutFetch('/pactl/status', 5000)
         .then(res => res.json())
         .then(data => {
-          applyPactlSinkUpdate({ sinkName: data.sinkName, syncType: data.type });
+          applyPactlSinkUpdate({ sinkName: data.sinkName, syncType: data.syncType });
           renderOutput(data.type === 'speakers' ? 'Speakers' : 'Bluetooth');
           applyPactlVolumeUpdate(data);
-          renderVolume();
         });
     };
 
     async function startup() {
       loadSpinner();
       const cfg = await readCfg();
-      if (cfg.output) renderOutput(cfg.output);   // restore UI pref immediately
       initEventListeners();
       initSSE();                                // hydration happens inside 'connected'
       unloadSpinner();
