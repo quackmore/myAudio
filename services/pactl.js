@@ -499,10 +499,8 @@ class PactlService extends EventEmitter {
   }
 
   async startup() {
-    console.log('Delayed pactl startup...');
     const sinkName = (await pactlRun('get-default-sink')).trim();
     const defaultSink = { sinkName, sinkType: sinkType(sinkName) };
-    console.log('Emitting default sink on startup:', defaultSink);
     this.emit(PactlEvents.DEFAULT_SINK_CHANGED, defaultSink);
     const vol = await volumeGet(defaultSink.sinkName);
     this.emit(PactlEvents.VOLUME_CHANGED, vol);
