@@ -9,7 +9,7 @@ import cfgfile from './cfgfile.js';
 // helpers
 // ---------------------------------------------------------------------------
 
-const audioServices = ['pipewire.service', 'pipewire.socket', 'pipewire-pulse', 'pipewire-pulse.socket', 'wireplumber'];
+const audioServices = ['pipewire.service', 'pipewire.socket', 'pipewire-pulse.service', 'pipewire-pulse.socket', 'wireplumber'];
 
 /**
  * Derive the PipeWire sink name from a Bluetooth MAC address.
