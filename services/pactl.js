@@ -9,6 +9,8 @@ import cfgfile from './cfgfile.js';
 // helpers
 // ---------------------------------------------------------------------------
 
+const audioServices = ['pipewire', 'pipewire-pulse', 'wireplumber'];
+
 /**
  * Derive the PipeWire sink name from a Bluetooth MAC address.
  * e.g. "01:15:21:47:16:D4" → "bluez_output.01_15_21_47_16_D4.1"
@@ -41,6 +43,27 @@ const pactlRun = async (...args) => {
 };
 
 /**
+ * Run a systemctl command
+ */
+const systemctlRun = async (...args) => {
+  const cmd = spawn('systemctl', args);
+  let stdout = '';
+  let stderr = '';
+  for await (const chunk of cmd.stdout) stdout += chunk;
+  for await (const chunk of cmd.stderr) stderr += chunk;
+  const exitCode = await new Promise(resolve => cmd.on('close', resolve));
+  if (exitCode) {
+    const msg = `pactl ${args.join(' ')} → exit ${exitCode}: ${stderr.trim()}`;
+    log.error(msg);
+    throw new Error(msg);
+  }
+  // there should be no output so log an error if any
+  if (stdout.length > 0)
+    log.error(`systemctl ${args} returned ${stdout}`);
+  return stdout;
+};
+
+/**
  * Parse the output of `pactl get-sink-volume` into a normalised object:
  *   { volumeLeft: "60%", volumeRight: "60%", volume: "60%" }
  *
@@ -65,6 +88,25 @@ const parseMute = (raw) => (raw.includes('yes') ? 'yes' : 'no');
 // ---------------------------------------------------------------------------
 // public API
 // ---------------------------------------------------------------------------
+
+/**
+ * Audio services required by pactl
+ */
+let audioServiceRunning = false;
+
+const startAudioServices = () => {
+  if (audioServiceRunning) return;
+  log.info('starting audio services');
+  systemctlRun('--user', 'start', ...audioServices);
+  audioServiceRunning = true;
+}
+
+const stopAudioServices = () => {
+  if (!audioServiceRunning) return;
+  log.info('ending audio services');
+  systemctlRun('--user', 'stop', ...audioServices);
+  audioServiceRunning = false;
+}
 
 /**
  * Read current volume and mute state for a sink.
@@ -541,6 +583,8 @@ export default {
   getDefaultSink,
   startWatcher: () => pactlService.startWatcher(),
   stopWatcher: () => pactlService.stopWatcher(),
+  startAudioServices,
+  stopAudioServices,
 };
 
 // named export for SSE route to subscribe

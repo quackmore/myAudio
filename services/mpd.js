@@ -4,8 +4,6 @@ const cmd = mpd.cmd;
 import log from './logger.js';
 import { spawn } from "child_process";
 import cfg from 'config';
-// import { btService, btEvents } from './bt.js';
-// import fs from 'fs';
 
 var mpdSt = {};
 
@@ -256,25 +254,6 @@ async function restart() {
   } else
     log.info("mpd restarted");
 }
-
-// btService.on(btEvents.DEVICE_CONNECTED, async address => {
-//   // await updateAlsaBtCfg(address);
-// //   if (cfg.has('player.bt_output')) {
-// //     log.info(`enabling mpd output ${cfg.get('player.bt_output')}`);
-// //     await output(['enableoutput', cfg.get('player.bt_output')]);
-//     if (mpdSt.status.state === 'play') {
-//       await playCmd('stop', []);
-//       await playCmd('play', []);
-//     }
-// //  }
-// })
-// 
-// btService.on(btEvents.DEVICE_DISCONNECTED, async address => {
-// //  if (cfg.has('player.bt_output')) {
-// //    log.info(`disabling mpd output ${cfg.get('player.bt_output')}`);
-// //    await output(['disableoutput', cfg.get('player.bt_output')]);
-// //  }
-// })
 
 export default {
   status: updateStatus,

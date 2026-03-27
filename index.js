@@ -9,6 +9,7 @@ import pactl from "./services/pactl.js";
 
 log.info(`${packageJSON.name} started`);
 cfgFile.init();
+pactl.startAudioServices();
 pactl.startWatcher();
 btService.start();
 mpd.start();
@@ -19,6 +20,7 @@ process.on('SIGINT', async () => {
     httpd.close();
     pactl.stopWatcher();
     await mpd.end();
+    pactl.stopAudioServices();
     btService.stop();
     log.info(`${packageJSON.name} ended`);
     log.end();
