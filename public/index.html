@@ -748,9 +748,25 @@
 
     const volumeToggleMute = async () => {
       loadSpinner();
-      if (getOutput() !== 'Speakers' && player.bt.selectedCtrl.ConnectedDevice == null) return;
+      const pactl = player.pactl;
+      // check UI consistency
+      if (getOutput() === 'Speakers' && pactl.defaultSink.sinkName.startsWith('bluez_output')) {
+        unloadSpinner();
+        return;
+      }
+      if (getOutput() !== 'Speakers' &&
+        (!pactl.defaultSink.sinkName.startsWith('bluez_output') || !pactl.volume.some(e => e.sinkName === pactl.defaultSink.sinkName))) {
+        unloadSpinner();
+        return;
+      }
+      // get current status
+      const currStatus = pactl.volume.find(e => e.sinkName === pactl.defaultSink.sinkName)?.mute;
+      if (!currStatus) {
+        unloadSpinner();
+        return;
+      }
       try {
-        await toutFetch(`/pactl/volume/mute/${player.speakers.mute === "yes" ? "unmute" : "mute"}`, 60000, { method: 'POST' });
+        await toutFetch(`/pactl/volume/mute/${currStatus === 'yes' ? 'unmute' : 'mute'}`, 60000, { method: 'POST' });
       } catch (err) {
         alert(`Failed to set volume to [mute|unmute] - ${err.message}`);
       }
