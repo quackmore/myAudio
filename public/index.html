@@ -547,6 +547,9 @@
       );
       if (player.bt.selectedCtrl?.Address === address)
         player.bt.selectedCtrl = { ...player.bt.selectedCtrl, Powered: powered };
+      // disconnect device if powered off
+      if (powered === 'no' && player.bt.selectedCtrl?.Address === address)
+        player.bt.selectedCtrl.ConnectedDevice = null;
     };
 
     const applyBTdeviceFound = ({ address, name }) => {
