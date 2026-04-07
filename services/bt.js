@@ -384,7 +384,7 @@ class BtService extends EventEmitter {
     log.info(`battery poll started for ${address} (every ${this.#batteryPollMs / 1000}s)`);
     const batteryFirstPollMs = config.has('bt.btBatteryFirstPollMs')
       ? config.get('bt.btBatteryFirstPollMs')
-      : 4000; // 4s is usually enough for BlueZ to negotiate the battery service
+      : 3000; // 4s is usually enough for BlueZ to negotiate the battery service
 
     // First read: short delay to let BlueZ expose the battery interface
     const firstRead = setTimeout(() => {

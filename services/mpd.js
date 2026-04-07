@@ -80,29 +80,31 @@ async function listinfo(info, options) {
     .catch(err => { throw new Error(err.message) });
 }
 
-async function output(options) {
-  try {
-    let data = await playCmd('outputs', []);
-    let outputs = parseArrayOfObj(data);
-    if (options.length == 0)
-      return outputs;
-    switch (options[0]) {
-      case 'disableoutput': {
-        await playCmd('disableoutput', [outputs.find(el => el.outputname === options[1]).outputid]);
-        let data = await playCmd('outputs', []);
-        return parseArrayOfObj(data);
-      }
-      case 'enableoutput': {
-        await playCmd('enableoutput', [outputs.find(el => el.outputname === options[1]).outputid]);
-        let data = await playCmd('outputs', []);
-        return parseArrayOfObj(data);
-      }
-      default: throw new Error(`unknown command ${options[0]}`);
-    }
-  } catch (err) {
-    throw new Error(err.message);
-  }
-}
+// outputs are now managed by pipewire
+// 
+// async function output(options) {
+//   try {
+//     let data = await playCmd('outputs', []);
+//     let outputs = parseArrayOfObj(data);
+//     if (options.length == 0)
+//       return outputs;
+//     switch (options[0]) {
+//       case 'disableoutput': {
+//         await playCmd('disableoutput', [outputs.find(el => el.outputname === options[1]).outputid]);
+//         let data = await playCmd('outputs', []);
+//         return parseArrayOfObj(data);
+//       }
+//       case 'enableoutput': {
+//         await playCmd('enableoutput', [outputs.find(el => el.outputname === options[1]).outputid]);
+//         let data = await playCmd('outputs', []);
+//         return parseArrayOfObj(data);
+//       }
+//       default: throw new Error(`unknown command ${options[0]}`);
+//     }
+//   } catch (err) {
+//     throw new Error(err.message);
+//   }
+// }
 
 let reconnectCount = 0;
 
@@ -151,7 +153,7 @@ function connect() {
     updateStatus()
       .then(() => {
         if (mpdSt.status) {
-          // on streaming pause stop the player (clean the cache)
+          // on streaming pause actually stop the player (clean the cache for a clean streaming restart)
           if (mpdSt.hasOwnProperty('curSong')
             && mpdSt.curSong.hasOwnProperty('file')
             && mpdSt.curSong.file.startsWith('http')
@@ -233,9 +235,15 @@ async function end() {
     log.info("mpd ended");
 }
 
+//
+// for future uses as rarely noticed mpd hangs up on streaming...
+//
 async function restart() {
   log.info("restarting mpd...");
-  let mpdCmd = spawn("mpd --kill && mpd", { shell: true });
+  // let mpdCmd = spawn("mpd --kill && mpd", { shell: true });
+  // that was a nice try but when mpd hangs up it really hangs up... 
+  // so better use the strong manners
+  let mpdCmd = spawn("pkill -9 mpd && mpd", { shell: true });
   let data = "";
   for await (const chunk of mpdCmd.stdout)
     data += chunk;
@@ -262,5 +270,5 @@ export default {
   start: start,
   end: end,
   restart: restart,
-  output: output
+  // output: output
 }
