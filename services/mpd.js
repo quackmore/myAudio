@@ -1,11 +1,24 @@
 import mpd from 'mpd';
 const cmd = mpd.cmd;
-// import { resolve } from 'path';
 import log from './logger.js';
-import { spawn } from "child_process";
+import EventEmitter from 'events';
+import { spawn } from 'child_process';
 import cfg from 'config';
 
-var mpdSt = {};
+// ---------------------------------------------------------------------------
+// Public event constants
+// ---------------------------------------------------------------------------
+
+const MpdEvents = {
+  STATE_CHANGED: 'state_changed',          // { state, curSong, status }
+  OPTIONS_CHANGED: 'options_changed',      // { status }
+  QUEUE_CHANGED: 'queue_changed',           // {}
+  STORED_PLAYLIST_CHANGED: 'stored_playlist_changed', // {}
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function parseObj(txt) {
   let obj = {};
@@ -34,241 +47,196 @@ function parseArrayOfObj(txt) {
   return array;
 }
 
-var client = null;
+// ---------------------------------------------------------------------------
+// MpdService
+// ---------------------------------------------------------------------------
 
-function updateStatus() {
-  return new Promise((resolve, reject) => {
-    if (!mpdSt.online)
-      resolve(mpdSt);
+class MpdService extends EventEmitter {
+
+  // ── private state ─────────────────────────────────────────────────────────
+
+  #client = null;
+  #mpdSt = {};             // last known { online, status, curSong }
+  #streamPlayRetry = 0;
+
+  // ── public lifecycle ──────────────────────────────────────────────────────
+
+  async start() {
+    log.info('starting mpd...');
+    const mpdProc = spawn('mpd', []);
+    let data = '';
+    let error = '';
+    for await (const chunk of mpdProc.stdout) data += chunk;
+    for await (const chunk of mpdProc.stderr) error += chunk;
+    const exitCode = await new Promise(resolve => mpdProc.on('close', resolve));
+    if (exitCode) {
+      log.error(`mpd error: ${data} - ${error}`);
+    } else {
+      log.info('mpd started');
+    }
+    this.#connect();
+  }
+
+  async end() {
+    // stop playing to flush stream cache before kill
+    try { await this.playCmd('stop', []); } catch (_) { }
+    log.info('ending mpd...');
+    const mpdProc = spawn('mpd', ['--kill']);
+    let data = '';
+    let error = '';
+    for await (const chunk of mpdProc.stdout) data += chunk;
+    for await (const chunk of mpdProc.stderr) error += chunk;
+    const exitCode = await new Promise(resolve => mpdProc.on('close', resolve));
+    if (exitCode)
+      log.error(`mpd --kill error: ${data} - ${error}`);
     else
-      client.sendCommand(cmd("status", []), (err, msg) => {
-        if (err) {
-          log.error(err.message);
-          reject(err);
-        } else {
-          mpdSt.status = parseObj(msg);
-          client.sendCommand(cmd("currentsong", []), (err, msg) => {
-            if (err) {
-              log.error(err.message);
-              reject(err);
-            } else {
-              mpdSt.curSong = parseObj(msg);
-              resolve(mpdSt);
-            }
-          });
-        }
-      });
-  });
-}
+      log.info('mpd ended');
+  }
 
-function playCmd(command, options) {
-  return new Promise((resolve, reject) => {
-    if (!mpdSt.online) reject(new Error("mpd offline"));
-    client.sendCommand(cmd(command, options), (err, msg) => {
-      if (err) {
-        log.error(err.message);
-        reject(err);
-      }
-      resolve(msg);
+  async restart() {
+    log.info('restarting mpd...');
+    const mpdProc = spawn('pkill -9 mpd && mpd', { shell: true });
+    let data = '';
+    let error = '';
+    for await (const chunk of mpdProc.stdout) data += chunk;
+    for await (const chunk of mpdProc.stderr) error += chunk;
+    const exitCode = await new Promise(resolve => mpdProc.on('close', resolve));
+    if (exitCode)
+      log.error(`mpd restart error: ${data} - ${error}`);
+    else
+      log.info('mpd restarted');
+  }
+
+  // ── public API ────────────────────────────────────────────────────────────
+
+  /** Returns the last known { online, status, curSong } snapshot. */
+  status() {
+    return this.#updateStatus();
+  }
+
+  playCmd(command, options) {
+    return new Promise((resolve, reject) => {
+      if (!this.#mpdSt.online) return reject(new Error('mpd offline'));
+      this.#client.sendCommand(cmd(command, options), (err, msg) => {
+        if (err) { log.error(err.message); return reject(err); }
+        resolve(msg);
+      });
     });
-  })
-}
-
-async function listinfo(info, options) {
-  return playCmd(info, options)
-    .then(data => parseArrayOfObj(data))
-    .catch(err => { throw new Error(err.message) });
-}
-
-// outputs are now managed by pipewire
-// 
-// async function output(options) {
-//   try {
-//     let data = await playCmd('outputs', []);
-//     let outputs = parseArrayOfObj(data);
-//     if (options.length == 0)
-//       return outputs;
-//     switch (options[0]) {
-//       case 'disableoutput': {
-//         await playCmd('disableoutput', [outputs.find(el => el.outputname === options[1]).outputid]);
-//         let data = await playCmd('outputs', []);
-//         return parseArrayOfObj(data);
-//       }
-//       case 'enableoutput': {
-//         await playCmd('enableoutput', [outputs.find(el => el.outputname === options[1]).outputid]);
-//         let data = await playCmd('outputs', []);
-//         return parseArrayOfObj(data);
-//       }
-//       default: throw new Error(`unknown command ${options[0]}`);
-//     }
-//   } catch (err) {
-//     throw new Error(err.message);
-//   }
-// }
-
-let reconnectCount = 0;
-
-function connect() {
-  let reconnectInterval = null;
-
-  client = mpd.connect({
-    port: 6600,
-    host: 'localhost',
-  });
-
-  client.on('ready', () => {
-    mpdSt.online = true;
-    clearInterval(reconnectInterval);
-    reconnectCount = 0;
-    log.info("connected to mpd");
-    updateStatus();
-  });
-
-  client.on('end', () => {
-    mpdSt.online = false;
-    if (reconnectCount < 10) {
-      reconnectInterval = setTimeout(connect, 1000);
-      reconnectCount++;
-    } else
-      reconnectInterval = setTimeout(connect, 3000);
-    log.info("connection to mpd closed");
-  });
-
-  client.on('error', (err) => {
-    log.error(err.message);
-  });
-
-  client.on('system', (name) => {
-    log.info(`update ${name}`);
-  });
-
-
-  var streamPlayRetry = 0;
-
-  function streamPlay() {
-    playCmd('play', []);
   }
 
-  client.on('system-player', () => {
-    updateStatus()
-      .then(() => {
-        if (mpdSt.status) {
-          // on streaming pause actually stop the player (clean the cache for a clean streaming restart)
-          if (mpdSt.hasOwnProperty('curSong')
-            && mpdSt.curSong.hasOwnProperty('file')
-            && mpdSt.curSong.file.startsWith('http')
-            && mpdSt.status.state === 'pause') {
-            playCmd('stop', []);
-          }
-          // on streaming errors retry connection
-          if (mpdSt.status.error) {
-            log.error(mpdSt.status.error);
-            if (mpdSt.hasOwnProperty('curSong')
-              && mpdSt.curSong.hasOwnProperty('file')
-              && mpdSt.curSong.file.startsWith('http')
-              && mpdSt.status.state === 'stop') {
-              if (streamPlayRetry < cfg.get('player.streamingReconnectCount')) {
-                streamPlayRetry++;
-                log.info(`will try to reconnect [${streamPlayRetry}] to stream in ${(cfg.get('player.streamingReconnectTimeout')) * streamPlayRetry / 1000} secs...`);
-                setTimeout(streamPlay, cfg.get('player.streamingReconnectTimeout'));
-              }
+  async listinfo(info, options) {
+    const data = await this.playCmd(info, options);
+    return parseArrayOfObj(data);
+  }
+
+  // ── private: connection ───────────────────────────────────────────────────
+
+  #reconnectCount = 0;
+
+  #connect() {
+    this.#client = mpd.connect({ port: 6600, host: 'localhost' });
+
+    this.#client.on('ready', () => {
+      this.#mpdSt.online = true;
+      this.#reconnectCount = 0;
+      log.info('connected to mpd');
+      this.#updateStatus();
+    });
+
+    this.#client.on('end', () => {
+      this.#mpdSt.online = false;
+      const delay = this.#reconnectCount < 10 ? 1000 : 3000;
+      setTimeout(() => this.#connect(), delay);
+      this.#reconnectCount++;
+      log.info('connection to mpd closed');
+    });
+
+    this.#client.on('error', (err) => {
+      log.error(err.message);
+    });
+
+    this.#client.on('system', (name) => {
+      log.info(`mpd subsystem update: ${name}`);
+    });
+
+    // ── subsystem events ──────────────────────────────────────────────────
+
+    this.#client.on('system-player', () => {
+      this.#updateStatus().then((st) => {
+        if (!st.status) return;
+
+        // streaming: pause → stop (clears cache for clean reconnect)
+        if (st.curSong?.file?.startsWith('http') && st.status.state === 'pause') {
+          this.playCmd('stop', []);
+          return; // system-player will fire again on the stop
+        }
+
+        // streaming: error → retry with backoff
+        if (st.status.error) {
+          log.error(`mpd error: ${st.status.error}`);
+          if (st.curSong?.file?.startsWith('http') && st.status.state === 'stop') {
+            const maxRetries = cfg.get('player.streamingReconnectCount');
+            if (this.#streamPlayRetry < maxRetries) {
+              this.#streamPlayRetry++;
+              const delay = cfg.get('player.streamingReconnectTimeout') * this.#streamPlayRetry;
+              log.info(`will try to reconnect [${this.#streamPlayRetry}] to stream in ${delay / 1000}s...`);
+              setTimeout(() => this.playCmd('play', []), delay);
             }
           }
-          // on streaming playing
-          if (mpdSt.hasOwnProperty('curSong')
-            && mpdSt.curSong.hasOwnProperty('file')
-            && mpdSt.curSong.file.startsWith('http')
-            && mpdSt.status.state === 'play') {
-            streamPlayRetry = 0;
-          }
         }
+
+        // streaming: playing → reset retry counter
+        if (st.curSong?.file?.startsWith('http') && st.status.state === 'play') {
+          this.#streamPlayRetry = 0;
+        }
+
+        this.emit(MpdEvents.STATE_CHANGED, { state: st.status.state, curSong: st.curSong, status: st.status });
       });
-  });
-}
+    });
 
-// connect();
+    this.#client.on('system-options', () => {
+      this.#updateStatus().then((st) => {
+        if (!st.status) return;
 
-async function start() {
-  log.info("starting mpd...");
-  let mpdCmd = spawn("mpd", []);
-  let data = "";
-  for await (const chunk of mpdCmd.stdout)
-    data += chunk;
-  let error = "";
-  for await (const chunk of mpdCmd.stderr) {
-    error += chunk;
+        this.emit(MpdEvents.OPTIONS_CHANGED, { status: st.status });
+      });
+    });
+
+    this.#client.on('system-playlist', async () => {
+      log.info('mpd queue changed');
+      const data = await this.playCmd("playlistinfo", []);
+      this.emit(MpdEvents.QUEUE_CHANGED, { songs: parseArrayOfObj(data) });
+    });
+
+    this.#client.on('system-stored-playlist', () => {
+      log.info('mpd stored playlists changed');
+      this.emit(MpdEvents.STORED_PLAYLIST_CHANGED, {});
+    });
   }
-  let exitCode = await new Promise((resolve, reject) => {
-    mpdCmd.on('close', resolve);
-  });
 
-  if (exitCode) {
-    let msg = `mpd error: ${data} - ${error}`;
-    log.error(msg);
-    // throw new Error(msg);
-  } else
-    log.info("mpd started");
-  connect();
-}
+  // ── private: status fetcher ───────────────────────────────────────────────
 
-async function end() {
-  // stop playing will clean stream cache avoiding issues on next restart
-  await playCmd('stop', []);
-  log.info("ending mpd...");
-  let mpdCmd = spawn("mpd", ["--kill"]);
-  let data = "";
-  for await (const chunk of mpdCmd.stdout)
-    data += chunk;
-  let error = "";
-  for await (const chunk of mpdCmd.stderr) {
-    error += chunk;
+  #updateStatus() {
+    return new Promise((resolve, reject) => {
+      if (!this.#mpdSt.online) return resolve(this.#mpdSt);
+      this.#client.sendCommand(cmd('status', []), (err, msg) => {
+        if (err) { log.error(err.message); return reject(err); }
+        this.#mpdSt.status = parseObj(msg);
+        this.#client.sendCommand(cmd('currentsong', []), (err, msg) => {
+          if (err) { log.error(err.message); return reject(err); }
+          this.#mpdSt.curSong = parseObj(msg);
+          resolve(this.#mpdSt);
+        });
+      });
+    });
   }
-  let exitCode = await new Promise((resolve, reject) => {
-    mpdCmd.on('close', resolve);
-  });
-
-  if (exitCode) {
-    let msg = `mpd error: ${data} - ${error}`;
-    log.error(msg);
-    // throw new Error(msg);
-  } else
-    log.info("mpd ended");
 }
 
-//
-// for future uses as rarely noticed mpd hangs up on streaming...
-//
-async function restart() {
-  log.info("restarting mpd...");
-  // let mpdCmd = spawn("mpd --kill && mpd", { shell: true });
-  // that was a nice try but when mpd hangs up it really hangs up... 
-  // so better use the strong manners
-  let mpdCmd = spawn("pkill -9 mpd && mpd", { shell: true });
-  let data = "";
-  for await (const chunk of mpdCmd.stdout)
-    data += chunk;
-  let error = "";
-  for await (const chunk of mpdCmd.stderr) {
-    error += chunk;
-  }
-  let exitCode = await new Promise((resolve, reject) => {
-    mpdCmd.on('close', resolve);
-  });
+// ---------------------------------------------------------------------------
+// Singleton
+// ---------------------------------------------------------------------------
 
-  if (exitCode) {
-    let msg = `mpd error: ${data} - ${error}`;
-    log.error(msg);
-    // throw new Error(msg);
-  } else
-    log.info("mpd restarted");
-}
+const mpdService = new MpdService();
 
-export default {
-  status: updateStatus,
-  playCmd: playCmd,
-  listinfo: listinfo,
-  start: start,
-  end: end,
-  restart: restart,
-  // output: output
-}
+export default mpdService;
+export { mpdService, MpdEvents };

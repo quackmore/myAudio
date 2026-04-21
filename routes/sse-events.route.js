@@ -3,18 +3,19 @@ import log from '../services/logger.js';
 import { speakersService, speakersEvents } from '../services/speakers.js';
 import { btService, btEvents } from '../services/bt.js';
 import { pactlService, PactlEvents } from '../services/pactl.js';
+import { mpdService, MpdEvents } from '../services/mpd.js';
 
 const router = express.Router();
 
 /**
  * Server-Sent Events endpoint.
- * Streams real-time Bluetooth and audio events to connected clients.
+ * Streams real-time Bluetooth, audio and MPD events to connected clients.
  */
 router.get('/', (req, res) => {
 
-  res.setHeader('Content-Type',  'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection',    'keep-alive');
+  res.setHeader('Content-Type',      'text/event-stream');
+  res.setHeader('Cache-Control',     'no-cache');
+  res.setHeader('Connection',        'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
 
   const sendEvent = (type, data) => {
@@ -28,12 +29,12 @@ router.get('/', (req, res) => {
 
   // ── Speakers handlers ────────────────────────────────────────────────────
 
-  const onSpeakersPoweredOn  = (val) => sendEvent('speakers_powered_on', val);
+  const onSpeakersPoweredOn  = (val) => sendEvent('speakers_powered_on',  val);
   const onSpeakersPoweredOff = (val) => sendEvent('speakers_powered_off', val);
 
   speakersService.on(speakersEvents.SPEAKERS_POWERED_ON,  onSpeakersPoweredOn);
   speakersService.on(speakersEvents.SPEAKERS_POWERED_OFF, onSpeakersPoweredOff);
-  
+
   // ── Bluetooth handlers ───────────────────────────────────────────────────
 
   const onControllerPoweredOn  = ({ address }) => sendEvent('bt_controller_powered_on',  { address });
@@ -60,13 +61,17 @@ router.get('/', (req, res) => {
   pactlService.on(PactlEvents.VOLUME_CHANGED,       onVolumeChanged);
   pactlService.on(PactlEvents.DEFAULT_SINK_CHANGED, onDefaultSinkChanged);
 
-  // ── MPD handlers (future) ────────────────────────────────────────────────
-  // const onMpdSongChanged  = (song)  => sendEvent('mpd_song_changed',  song);
-  // const onMpdStateChanged = (state) => sendEvent('mpd_state_changed', { state });
-  // const onMpdQueueChanged = ()      => sendEvent('mpd_queue_changed', {});
-  // mpdService.on(MpdEvents.SONG_CHANGED,  onMpdSongChanged);
-  // mpdService.on(MpdEvents.STATE_CHANGED, onMpdStateChanged);
-  // mpdService.on(MpdEvents.QUEUE_CHANGED, onMpdQueueChanged);
+  // ── MPD handlers ─────────────────────────────────────────────────────────
+
+  const onMpdStateChanged          = (data) => sendEvent('mpd_state_changed',           data);
+  const onMpdOptionsChanged        = (data) => sendEvent('mpd_options_changed',         data);
+  const onMpdQueueChanged          = (data) => sendEvent('mpd_queue_changed',           data);
+  const onMpdStoredPlaylistChanged = ()     => sendEvent('mpd_stored_playlist_changed',  {});
+
+  mpdService.on(MpdEvents.STATE_CHANGED,           onMpdStateChanged);
+  mpdService.on(MpdEvents.OPTIONS_CHANGED,         onMpdOptionsChanged);
+  mpdService.on(MpdEvents.QUEUE_CHANGED,           onMpdQueueChanged);
+  mpdService.on(MpdEvents.STORED_PLAYLIST_CHANGED, onMpdStoredPlaylistChanged);
 
   // ── Cleanup on disconnect ────────────────────────────────────────────────
 
@@ -75,7 +80,7 @@ router.get('/', (req, res) => {
 
     speakersService.off(speakersEvents.SPEAKERS_POWERED_ON,  onSpeakersPoweredOn);
     speakersService.off(speakersEvents.SPEAKERS_POWERED_OFF, onSpeakersPoweredOff);
-  
+
     btService.off(btEvents.CONTROLLER_POWERED_ON,  onControllerPoweredOn);
     btService.off(btEvents.CONTROLLER_POWERED_OFF, onControllerPoweredOff);
     btService.off(btEvents.DEVICE_FOUND,           onDeviceFound);
@@ -84,13 +89,13 @@ router.get('/', (req, res) => {
     btService.off(btEvents.DEVICE_REMOVED,         onDeviceRemoved);
     btService.off(btEvents.DEVICE_BATTERY_CHANGED, onBatteryChanged);
 
-
     pactlService.off(PactlEvents.VOLUME_CHANGED,       onVolumeChanged);
     pactlService.off(PactlEvents.DEFAULT_SINK_CHANGED, onDefaultSinkChanged);
 
-    // mpdService.off(MpdEvents.SONG_CHANGED,  onMpdSongChanged);
-    // mpdService.off(MpdEvents.STATE_CHANGED, onMpdStateChanged);
-    // mpdService.off(MpdEvents.QUEUE_CHANGED, onMpdQueueChanged);
+    mpdService.off(MpdEvents.STATE_CHANGED,           onMpdStateChanged);
+    mpdService.off(MpdEvents.OPTIONS_CHANGED,         onMpdOptionsChanged);
+    mpdService.off(MpdEvents.QUEUE_CHANGED,           onMpdQueueChanged);
+    mpdService.off(MpdEvents.STORED_PLAYLIST_CHANGED, onMpdStoredPlaylistChanged);
 
     res.end();
   });

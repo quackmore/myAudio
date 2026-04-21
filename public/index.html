@@ -98,7 +98,7 @@
   </div>
   <div class="lowBox">
     <ul class="noGrowNoShrink tabrow">
-      <li class="pointer" onclick="loadQueue()" id="queueTab">Queue</li>
+      <li class="pointer" onclick="queueTab()" id="queueTab">Queue</li>
       <li class="pointer" onclick="listPlaylists()" id="playlistsTab">Playlists</li>
       <li class="pointer" onclick="loadFiles()" id="filesTab">Files</li>
       <li class="pointer" onclick="loadStreams()" id="streamsTab">Streams</li>
@@ -190,7 +190,7 @@
       <button class="cmdBtn" onclick="podShowContent()" id="podSCBtn">show content</button>
     </div>
     <div class="noGrowNoShrink right" style="width: 100%; height: 60px;">
-      <div class="right" id="queueFn">
+      <div class="right" id="queueFn" style="width: 100%; justify-content: space-between;">
         <div class="left" style="font-size: medium;">
           <span id="queueDuration"></span>
         </div>
@@ -243,6 +243,7 @@
     // PLAYER
 
     var player = {};
+    var bluetooth = {};
 
     const btDevDefault = 'Bluetooth';
     var btDevName = btDevDefault;
@@ -281,7 +282,7 @@
     }
 
     async function outputSwitch() {
-      let btPowered = player.bt.selectedCtrl.Powered;
+      let btPowered = bluetooth.selectedCtrl.Powered;
       let url = getOutput() === 'Speakers' ? `/speakers/toggle` : `/bt/cmd/power%20${btPowered === 'yes' ? 'off' : 'on'}`;
       let req = {
         method: 'POST',
@@ -297,26 +298,10 @@
       setTimeout(unloadSpinner, 500);
     }
 
-    let firstTime = true;
-    let getPlayerStatusFail = 0;
-
-    const refreshPlayerStatus = async () => {
-      try {
-        await getMpdStatus();
-        updateMpdPlayer();
-        getPlayerStatusFail = 0;
-      }
-      catch (err) {
-        getPlayerStatusFail++;
-        if (getPlayerStatusFail > 2)
-          alert(err.message);
-      }
-    }
-
     // SPEAKERS
 
-    player.speakers = {};
-    player.speakers.power = null;
+    var speakers = {};
+    speakers.power = null;
 
     const initSpeakerStatus = () => {
       return toutFetch('/speakers/status', 5000)
@@ -325,12 +310,12 @@
     }
 
     const applySpeakersUpdate = (val) => {
-      player.speakers = { ...player.speakers, ...val };
+      speakers = { ...speakers, ...val };
     }
 
     const renderSpeakers = () => {
       if (getOutput() !== 'Speakers') return;
-      document.getElementById('outputSwitch').innerHTML = (player.speakers.power === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
+      document.getElementById('outputSwitch').innerHTML = (speakers.power === 'on' ? '<i class="fa-solid fa-toggle-on fa-xl"></i>' : '<i class="fa-solid fa-toggle-off fa-xl"></i>');
     }
 
     // MPD PLAYER
@@ -343,47 +328,46 @@
       for (opt of options)
         url += `/${opt}`;
       return toutFetch(url, 5000, req)
-        .then(res => res.json())
-        .then(() => refreshPlayerStatus())
-        .then(() => refreshQueue())
         .catch(err => alert(err.message));
     }
 
-    const getMpdStatus = () => {
+    const initPlayerStatus = () => {
       return toutFetch(`/mpd/status`, 5000)
         .then(res => res.json())
-        .then(data => player.mpd = data)
+        .then(data => player = data)
+    }
+
+    const applyPlayerUpdate = (val) => {
+      player = { ...player, ...val };
     }
 
     const setPosition = async (perc) => {
-      if (player.hasOwnProperty('mpd')
-        && player.mpd.hasOwnProperty('curSong')
-        && player.mpd.hasOwnProperty('status')
-        && !player.mpd.curSong.file.startsWith('http')) {
+      if (player.hasOwnProperty('curSong')
+        && player.hasOwnProperty('status')
+        && !player.curSong.file.startsWith('http')) {
         setUpdateElapsed(0);
-        let duration = parseFloat(player.mpd.status.duration);
+        let duration = parseFloat(player.status.duration);
         await mpdCmd('seekcur', [duration * perc / 100]);
         setUpdateElapsed(1000);
       }
     }
 
     const refreshElapsed = async () => {
-      if (!player.mpd || !player.mpd.status) return;
-      if (!player.mpd.hasOwnProperty('curSong')) return;
-      if (player.mpd.curSong.file.startsWith('http')) {
-        let elapsed = parseFloat(player.mpd.status.elapsed) + 1.0;
-        player.mpd.status.elapsed = elapsed.toString();
+      if (!player.status) return;
+      if (!player.hasOwnProperty('curSong')) return;
+      if (player.curSong.file.startsWith('http')) {
+        let elapsed = parseFloat(player.status.elapsed) + 1.0;
+        player.status.elapsed = elapsed.toString();
         document.getElementById('duration').innerText = `${secsToString(elapsed)}`;
         document.getElementById('elapsed').value = 0;
       } else {
-        let elapsed = parseFloat(player.mpd.status.elapsed) + 1.0;
-        let duration = parseFloat(player.mpd.status.duration);
-        document.getElementById('duration').innerText = `${secsToString(elapsed)} - ${secsToString(duration)}`;
+        let elapsed = parseFloat(player.status.elapsed) + 1.0;
+        let duration = parseFloat(player.status.duration);
         if (elapsed >= duration) {
-          await refreshPlayerStatus();
-          refreshQueue();
+          renderQueue();
         } else {
-          player.mpd.status.elapsed = elapsed.toString();
+          player.status.elapsed = elapsed.toString();
+          document.getElementById('duration').innerText = `${secsToString(elapsed)} - ${secsToString(duration)}`;
           document.getElementById('elapsed').value = 100 * elapsed / duration;
         }
       }
@@ -397,27 +381,27 @@
     }
 
     const toggleShuffle = () => {
-      if (!player.mpd) return;
-      if (player.mpd.status.random === '1')
+      if (!player) return;
+      if (player.status.random === '1')
         mpdCmd('random', ['0']);
       else
         mpdCmd('random', ['1']);
     }
 
     const togglePlay = () => {
-      if (!player.mpd) return;
-      if (player.mpd.status.state === 'play')
+      if (!player) return;
+      if (player.status.state === 'play')
         mpdCmd('pause', []);
       else
         mpdCmd('play', []);
     }
 
     const toggleRepeat = () => {
-      if (!player.mpd) return;
-      if (player.mpd.status.repeat === '0') {
+      if (!player) return;
+      if (player.status.repeat === '0') {
         mpdCmd('repeat', ['1']);
       } else {
-        if (player.mpd.status.single === '0')
+        if (player.status.single === '0')
           mpdCmd('single', ['1']);
         else {
           mpdCmd('repeat', ['0']);
@@ -433,16 +417,11 @@
       document.getElementById('play').className = "fa-solid fa-play fa-xl actC";
     }
 
-    const updateMpdPlayer = () => {
-      // if (!player.hasOwnProperty('mpd') || !player.mpd.hasOwnProperty('curSong') || !player.mpd.curSong.hasOwnProperty('file')) {
-      if (!player.hasOwnProperty('mpd')) {
-        playerDefault();
-        return;
-      }
+    const renderPlayer = () => {
       // DEBUG
       // console.log(player);
-      if (player.mpd.hasOwnProperty('curSong') && player.mpd.curSong.hasOwnProperty('file')) {
-        let curSong = player.mpd.curSong;
+      if (player?.curSong && player?.curSong?.file) {
+        let curSong = player.curSong;
         let desc = "";
         if (curSong.file.startsWith('http')) {
           // stream
@@ -464,22 +443,21 @@
         }
         document.getElementById('song').innerHTML = desc;
       }
-      if (player.mpd.hasOwnProperty('status')) {
-        if (player.mpd.status.error) alert(player.mpd.status.error);
-        //document.getElementById('elapsed').value = 100 * parseFloat(player.mpd.status.elapsed) / parseFloat(player.mpd.status.duration);
-        if (player.mpd.status.random === '1')
+      if (player.hasOwnProperty('status')) {
+        if (player.status.error) alert(player.status.error);
+        if (player.status.random === '1')
           document.getElementById('shuffle').style.color = null;
         else
           document.getElementById('shuffle').style.color = 'lightgray';
-        if (player.mpd.status.repeat === '1')
+        if (player.status.repeat === '1')
           document.getElementById('repeat').style.color = null;
         else
           document.getElementById('repeat').style.color = 'lightgray';
-        if (player.mpd.status.single === '1')
+        if (player.status.single === '1')
           document.getElementById('single').style.color = null;
         else
           document.getElementById('single').style.color = 'lightgray';
-        if (player.mpd.status.state === 'play') {
+        if (player.status.state === 'play') {
           document.getElementById('play').className = "fa-solid fa-pause fa-xl actC";
           refreshElapsed();
           setUpdateElapsed(1000);
@@ -495,30 +473,30 @@
     const connectDev = async (idx) => {
       loadSpinner();
       try {
-        if (player.bt.devices[idx].Paired == 'no') {
-          await toutFetch(`/bt/cmd/pair%20${escape(player.bt.devices[idx].Address)}`, 60000, { method: 'POST' });
+        if (bluetooth.devices[idx].Paired == 'no') {
+          await toutFetch(`/bt/cmd/pair%20${escape(bluetooth.devices[idx].Address)}`, 60000, { method: 'POST' });
           await msWait(600);
         }
-        if (player.bt.devices[idx].Trusted == 'no') {
-          await toutFetch(`/bt/cmd/trust%20${escape(player.bt.devices[idx].Address)}`, 60000, { method: 'POST' });
+        if (bluetooth.devices[idx].Trusted == 'no') {
+          await toutFetch(`/bt/cmd/trust%20${escape(bluetooth.devices[idx].Address)}`, 60000, { method: 'POST' });
           await msWait(600);
         }
-        await toutFetch(`/bt/cmd/connect%20${escape(player.bt.devices[idx].Address)}`, 60000, { method: 'POST' });
+        await toutFetch(`/bt/cmd/connect%20${escape(bluetooth.devices[idx].Address)}`, 60000, { method: 'POST' });
       } catch (err) {
-        alert(`Failed to connect to ${player.bt.devices[idx].Name}: ${err.message}`);
+        alert(`Failed to connect to ${bluetooth.devices[idx].Name}: ${err.message}`);
       }
       await msWait(1000);
       unloadSpinner();
     }
 
     const deleteDev = async (idx) => {
-      toutFetch(`/bt/cmd/remove%20${escape(player.bt.devices[idx].Address)}`, 60000, {
+      toutFetch(`/bt/cmd/remove%20${escape(bluetooth.devices[idx].Address)}`, 60000, {
         method: 'POST'
       })
         .then(async () => {
-          await player.bt.devices.splice(idx, 1);
+          await bluetooth.devices.splice(idx, 1);
         })
-        .catch((err) => alert(`Failed to remove ${player.bt.devices[idx].Name}: ${err.message}`));
+        .catch((err) => alert(`Failed to remove ${bluetooth.devices[idx].Name}: ${err.message}`));
     }
 
     const openBtDevMod = () => {
@@ -535,55 +513,55 @@
       return toutFetch(`/bt/status`, 5000)
         .then(res => res.json())
         .then(data => {
-          player.bt = data;
+          bluetooth = data;
         })
     }
 
     // ── state appliers (always run, no DOM touches) ──────────────────────────
 
     const applyBTctrlPower = ({ address, powered }) => {
-      player.bt.controllers = player.bt.controllers.map(c =>
+      bluetooth.controllers = bluetooth.controllers.map(c =>
         c.Address === address ? { ...c, Powered: powered } : c
       );
-      if (player.bt.selectedCtrl?.Address === address)
-        player.bt.selectedCtrl = { ...player.bt.selectedCtrl, Powered: powered };
+      if (bluetooth.selectedCtrl?.Address === address)
+        bluetooth.selectedCtrl = { ...bluetooth.selectedCtrl, Powered: powered };
       // disconnect device if powered off
-      if (powered === 'no' && player.bt.selectedCtrl?.Address === address)
-        player.bt.selectedCtrl.ConnectedDevice = null;
+      if (powered === 'no' && bluetooth.selectedCtrl?.Address === address)
+        bluetooth.selectedCtrl.ConnectedDevice = null;
     };
 
     const applyBTdeviceFound = ({ address, name }) => {
-      if (!player.bt.devices.some(d => d.Address === address))
-        player.bt.devices.push({ Address: address, Name: name });
+      if (!bluetooth.devices.some(d => d.Address === address))
+        bluetooth.devices.push({ Address: address, Name: name });
     };
 
     const applyBTdeviceConnected = ({ address, name }) => {
-      const dev = player.bt.devices.find(d => d.Address === address)
+      const dev = bluetooth.devices.find(d => d.Address === address)
         ?? { Address: address, Name: name };
-      if (player.bt.selectedCtrl)
-        player.bt.selectedCtrl.ConnectedDevice = dev;
+      if (bluetooth.selectedCtrl)
+        bluetooth.selectedCtrl.ConnectedDevice = dev;
     };
 
     const applyBTdeviceDisconnected = ({ address }) => {
-      if (player.bt.selectedCtrl?.ConnectedDevice?.Address === address)
-        player.bt.selectedCtrl.ConnectedDevice = null;
+      if (bluetooth.selectedCtrl?.ConnectedDevice?.Address === address)
+        bluetooth.selectedCtrl.ConnectedDevice = null;
     };
 
     const applyBTdeviceRemoved = ({ address }) => {
-      player.bt.devices = player.bt.devices.filter(d => d.Address !== address);
-      if (player.bt.selectedCtrl?.ConnectedDevice?.Address === address)
-        player.bt.selectedCtrl.ConnectedDevice = null;
+      bluetooth.devices = bluetooth.devices.filter(d => d.Address !== address);
+      if (bluetooth.selectedCtrl?.ConnectedDevice?.Address === address)
+        bluetooth.selectedCtrl.ConnectedDevice = null;
     };
 
     const applyBTdeviceBatteryUpdate = ({ address, battery }) => {
-      if (player.bt.selectedCtrl?.ConnectedDevice?.Address === address)
-        player.bt.selectedCtrl.ConnectedDevice.battery = battery;
+      if (bluetooth.selectedCtrl?.ConnectedDevice?.Address === address)
+        bluetooth.selectedCtrl.ConnectedDevice.battery = battery;
     };
 
-    // ── renderers (only touch DOM, read from player.bt) ──────────────────────
+    // ── renderers (only touch DOM, read from bluetooth) ──────────────────────
 
     const renderBTdesc = () => {
-      const connected = player.bt.selectedCtrl?.ConnectedDevice;
+      const connected = bluetooth.selectedCtrl?.ConnectedDevice;
       if (connected) {
         const batLev = parseInt(connected.battery);
         const batIco = !connected.battery ? 'quarter'
@@ -603,22 +581,22 @@
 
     const renderBTctrlPower = () => {
       if (getOutput() === 'Speakers') return;
-      const powered = player.bt.selectedCtrl?.Powered === 'yes';
+      const powered = bluetooth.selectedCtrl?.Powered === 'yes';
       document.getElementById('outputSwitch').innerHTML = powered
         ? '<i class="fa-solid fa-toggle-on fa-xl"></i>'
         : '<i class="fa-solid fa-toggle-off fa-xl"></i>';
     };
 
     const renderBTdevices = () => {
-      const ctrl = player.bt.selectedCtrl;
+      const ctrl = bluetooth.selectedCtrl;
       if (getOutput() === 'Speakers'
         || ctrl?.Powered === 'no'
         || ctrl?.ConnectedDevice !== null
-        || player.bt.devices.length === 0) {
+        || bluetooth.devices.length === 0) {
         closeBtDevMod();
         return;
       }
-      const html = player.bt.devices.map((dev, idx) =>
+      const html = bluetooth.devices.map((dev, idx) =>
         `<div class="justify">
            <span class="pointer" onclick="connectDev(${idx})">${dev.Name}</span>
            <span class="right">
@@ -632,7 +610,7 @@
 
     const renderBT = () => {
       // DEBUG
-      // console.log('renderBT', player.bt);
+      // console.log('renderBT', bluetooth);
       renderBTctrlPower();
       renderBTdevices();
       renderBTdesc();
@@ -640,20 +618,20 @@
 
     // PACTL / VOLUME
 
-    player.pactl = {
+    var pactl = {
       defaultSink: null,
       volume: [],
     };
 
     const applyPactlSinkUpdate = (sink) => {
-      player.pactl.defaultSink = sink;
+      pactl.defaultSink = sink;
     };
 
     const applyPactlVolumeUpdate = (vol) => {
-      if (!player.pactl.volume.some(d => d.sink === vol.sink))
-        player.pactl.volume.push(vol);
+      if (!pactl.volume.some(d => d.sink === vol.sink))
+        pactl.volume.push(vol);
       else
-        player.pactl.volume = player.pactl.volume.map(d =>
+        pactl.volume = pactl.volume.map(d =>
           d.sink === vol.sink ? { ...d, ...vol } : d
         );
     };
@@ -680,20 +658,20 @@
 
     const renderVolume = () => {
       if (getOutput() !== 'Speakers') {
-        const connected = player.bt.selectedCtrl?.ConnectedDevice;
+        const connected = bluetooth.selectedCtrl?.ConnectedDevice;
         if (!connected) {
           renderVolumeDisabled();
           return;
         }
         const addressInSinkName = `${connected.Address.replace(/:/g, '_')}`;
-        const vol = player.pactl.volume.find(v => v.sink.includes(addressInSinkName));
+        const vol = pactl.volume.find(v => v.sink.includes(addressInSinkName));
         if (!vol) {
           renderVolumeDisabled();
           return;
         }
         renderVolumeEnabled(vol);
       } else {
-        const vol = player.pactl.volume.find(v => v.type === 'speakers');
+        const vol = pactl.volume.find(v => v.type === 'speakers');
         if (!vol) {
           renderVolumeDisabled();
           return;
@@ -705,9 +683,9 @@
     const volumeSet = async () => {
       let vol = document.getElementById('volRange').value;
       loadSpinner();
-      if (getOutput() === 'Speakers' && `${vol}%` === player.speakers.volume) return;
-      if (getOutput() !== 'Speakers' && player.bt.selectedCtrl.ConnectedDevice == null) return;
-      let connected = player.bt.selectedCtrl.ConnectedDevice;
+      if (getOutput() === 'Speakers' && `${vol}%` === speakers.volume) return;
+      if (getOutput() !== 'Speakers' && bluetooth.selectedCtrl.ConnectedDevice == null) return;
+      let connected = bluetooth.selectedCtrl.ConnectedDevice;
       if (getOutput() !== 'Speakers' && `${vol}%` === connected.volume) return;
       try {
         await toutFetch(`/pactl/volume/set/${vol}%25`, 60000, { method: 'POST' });
@@ -726,7 +704,7 @@
       loadSpinner();
       let balance_option = 'none';
       if (balance == 'frontleft' || balance == 'frontright') balance_option = balance;
-      if (getOutput() !== 'Speakers' && player.bt.selectedCtrl.ConnectedDevice == null) return;
+      if (getOutput() !== 'Speakers' && bluetooth.selectedCtrl.ConnectedDevice == null) return;
       try {
         await toutFetch(`/pactl/volume/inc`, 60000, { method: 'POST' });
       } catch (err) {
@@ -740,7 +718,7 @@
       loadSpinner();
       let balance_option = 'none';
       if (balance == 'frontleft' || balance == 'frontright') balance_option = balance;
-      if (getOutput() !== 'Speakers' && player.bt.selectedCtrl.ConnectedDevice == null) return;
+      if (getOutput() !== 'Speakers' && bluetooth.selectedCtrl.ConnectedDevice == null) return;
       try {
         await toutFetch(`/pactl/volume/dec`, 60000, { method: 'POST' });
       } catch (err) {
@@ -751,7 +729,6 @@
 
     const volumeToggleMute = async () => {
       loadSpinner();
-      const pactl = player.pactl;
       // check UI consistency
       if (getOutput() === 'Speakers' && pactl.defaultSink.sinkName.startsWith('bluez_output')) {
         unloadSpinner();
@@ -1012,63 +989,87 @@
           if (res.desc.startsWith(' - ')) res.desc = res.desc.slice(3);
         }
       }
-      if (player.mpd.hasOwnProperty('curSong') &&
-        player.mpd.curSong.file === item.file) {
+      if (player.hasOwnProperty('curSong') &&
+        player.curSong.file === item.file) {
         res.style = 'style="color: blue; "';
-        if (player.mpd.status.state === "play")
+        if (player.status.state === "play")
           res.playing += '&nbsp&nbsp&nbsp&nbsp<i class="fa-solid fa-music fa-2xs"></i>';
       }
       return res;
     }
 
-    const loadQueue = async () => {
-      loadSpinner();
+    const queueTab = () => {
       selectTab("queueTab");
       selectFN("queueFn");
       selectCmds("queueCmds");
-      toutFetch(`/mpd/listinfo/playlistinfo`, 5000)
+      renderQueue();
+    }
+
+    const selectQueueTab = () => {
+      selectTab("queueTab");
+      selectFN("queueFn");
+      selectCmds("queueCmds");
+    }
+
+    const initQueue = async () => {
+      loadSpinner();
+      return toutFetch(`/mpd/listinfo/playlistinfo`, 5000)
         .then(data => data.json())
         .then(data => {
           queue.songs = data;
           queue.duration = 0.0;
-          if (queue.songs.length) {
-            let pl_content = '<ul class="tabCntList">';
-            for ([idx, item] of queue.songs.entries()) {
-              if (parseFloat(item.duration))
-                queue.duration += parseFloat(item.duration);
-              let qline = getQueueDes(item);
-              pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
+          if (queue?.songs.length > 0) {
+            for (const item of queue.songs) {
+              const duration = parseFloat(item.duration);
+              const isStreaming = item.file.startsWith('http');
+              if (!Number.isNaN(duration) && !isStreaming) {
+                queue.duration += duration;
+              }
             }
-            // DEBUG
-            // console.log(queue);
-            pl_content += "</ul>";
-            document.getElementById("tabCt").innerHTML = pl_content;
-            if (queue.songs[0].file.startsWith('http'))
-              document.getElementById("queueDuration").innerText = '';
-            else
-              document.getElementById("queueDuration").innerText = secsToString(queue.duration);
-          } else {
-            document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
-            document.getElementById("queueDuration").innerText = "";
-
           }
         })
         .catch(err => alert(err.message))
         .finally(() => unloadSpinner());
+    }
 
+    const applyQueueUpdate = (songs) => {
+      queue.songs = songs;
+      queue.duration = 0.0;
+      if (queue?.songs.length > 0) {
+        for (const item of queue.songs) {
+          const duration = parseFloat(item.duration);
+          const isStreaming = item.file.startsWith('http');
+          if (!Number.isNaN(duration) && !isStreaming) {
+            queue.duration += duration;
+          }
+        }
+      }
+    };
+
+    const renderQueue = () => {
+      if (!document.getElementById("queueTab").classList.contains("selected")) return;
+      if (queue?.songs.length > 0) {
+        let pl_content = '<ul class="tabCntList">';
+        for ([idx, item] of queue.songs.entries()) {
+          let qline = getQueueDes(item);
+          pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
+        }
+        pl_content += "</ul>";
+        document.getElementById("tabCt").innerHTML = pl_content;
+        document.getElementById("queueDuration").innerText = secsToString(queue.duration);
+      } else {
+        document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+        document.getElementById("queueDuration").innerText = "";
+      }
     }
 
     const clearQueue = () => {
-      if (queue.hasOwnProperty('songs') && queue.songs.length > 0) {
+      if (queue?.songs.length > 0) {
         let text = "This is gonna clear the queue...";
         if (confirm(text) == true) {
           mpdCmd('clear', []);
         }
       }
-    }
-
-    const refreshQueue = () => {
-      if (document.getElementById("queueTab").classList.contains("selected")) loadQueue();
     }
 
     function saveQueue() {
@@ -1117,7 +1118,7 @@
       mpdCmd('clear', [])
         .then(() => liSelected.map(el => mpdCmd('load', [playlists[el].playlist])))
         .catch(err => alert(err.message))
-        .finally(() => loadQueue());
+        .finally(() => selectQueueTab());
     }
 
     function plAddToQueue() {
@@ -1265,7 +1266,7 @@
       mpdCmd('clear', [])
         .then(() => liSelected.map(el => mpdCmd('add', [encodeURIComponent((curPath === "" ? curPath : curPath + '/') + (files[el].directory ? files[el].directory : files[el].file))])))
         .catch(err => alert(err.message))
-        .finally(() => loadQueue());
+        .finally(() => selectQueueTab());
     }
 
     function fsAddToQueue() {
@@ -1353,7 +1354,7 @@
         .then(() => mpdCmd('play', []))
         .then(() => toutFetch(`/stream/deleteStreamingPlaylist`, 5000, { method: 'POST' }))
         .catch(err => alert(err.message))
-        .finally(() => loadQueue());
+        .finally(() => selectQueueTab());
     }
 
     function stModify() {
@@ -1632,29 +1633,29 @@
             renderSpeakers();
             renderBT();
             renderVolume();
-            await getMpdStatus();
-            updateMpdPlayer();
-            loadQueue();
+            await initPlayerStatus();
+            renderPlayer();
+            await initQueue();
+            renderQueue();
             break;
-
+          // PACTL
           case 'volume_changed':
             applyPactlVolumeUpdate(event.data);
             renderVolume();
             break;
-
           case 'default_sink_changed':
             applyPactlSinkUpdate(event.data);
             renderOutput(event.data.syncType === 'speakers' ? 'Speakers' : 'Bluetooth');
             renderVolume();
             break;
-
+          // SPEAKERS
           case 'speakers_powered_on':
           case 'speakers_powered_off':
             applySpeakersUpdate(event.data);
             renderSpeakers();
             renderVolume();
             break;
-
+          // BLUETOOTH
           case 'bt_controller_powered_on':
             applyBTctrlPower({ address: event.data.address, powered: 'yes' });
             renderBT();
@@ -1686,6 +1687,23 @@
             applyBTdeviceBatteryUpdate({ address: event.data.address, battery: event.data.battery });
             renderBTdesc();
             break;
+          // MPD
+          case 'mpd_state_changed':
+            applyPlayerUpdate({ status: event.data.status, ...(event.data?.curSong && { curSong: event.data.curSong }) });
+            renderPlayer();
+            renderQueue();
+            break;
+          case 'mpd_options_changed':
+            applyPlayerUpdate({ status: event.data.status });
+            renderPlayer();
+            break;
+          case 'mpd_queue_changed':
+            applyQueueUpdate(event.data.songs);
+            renderQueue();
+            break;
+          case 'stored_playlist_changed':
+            // nothing to do
+            break;
         }
       };
 
@@ -1706,8 +1724,10 @@
 
     async function startup() {
       loadSpinner();
+      playerDefault();
       const cfg = await readCfg();
       initEventListeners();
+      selectQueueTab();
       initSSE();                                // hydration happens inside 'connected'
       unloadSpinner();
     }
