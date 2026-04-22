@@ -780,6 +780,12 @@
       return selectedTab.id;
     }
 
+    const setTabContent = (html) => {
+      const el = document.getElementById("tabCt");
+      el.innerHTML = html;
+      el.scrollTop = 0;
+    };
+
     // CONTENT FOOTNOTE
 
     var selectedFN = null;
@@ -1055,10 +1061,10 @@
           pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}" ${qline.style}>${qline.desc}${qline.playing}</li>`;
         }
         pl_content += "</ul>";
-        document.getElementById("tabCt").innerHTML = pl_content;
+        setTabContent(pl_content);
         document.getElementById("queueDuration").innerText = secsToString(queue.duration);
       } else {
-        document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+        setTabContent('<ul class="tabCntList"><li>Empty.</li></ul>');
         document.getElementById("queueDuration").innerText = "";
       }
     }
@@ -1107,9 +1113,9 @@
             for ([idx, item] of playlists.entries())
               pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${item.playlist}</li>`;
             pl_content += "</ul>";
-            document.getElementById("tabCt").innerHTML = pl_content;
+            setTabContent(pl_content);
           } else
-            document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+            setTabContent('<ul class="tabCntList"><li>Empty.</li></ul>');
         })
         .catch(err => alert(err.message));
     }
@@ -1134,9 +1140,9 @@
         let pl_content = '<ul class="tabCntList">';
         playlistSongs.map((el, idx) => pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${el.file}</li>`)
         pl_content += "</ul>";
-        document.getElementById("tabCt").innerHTML = pl_content;
+        setTabContent(pl_content);
       } else
-        document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+        setTabContent('<ul class="tabCntList"><li>Empty.</li></ul>');
     }
 
     function plModify() {
@@ -1238,9 +1244,9 @@
                 pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${item.file}</li>`;
             }
             pl_content += "</ul>";
-            document.getElementById("tabCt").innerHTML = pl_content;
+            setTabContent(pl_content);
           } else
-            document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+            setTabContent('<ul class="tabCntList"><li>Empty.</li></ul>');
         })
         .catch(err => alert(err.message));
     }
@@ -1309,9 +1315,9 @@
             for ([idx, item] of streams.entries())
               pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${item.name} - <small><i>${item.url}</i></small></li>`;
             pl_content += "</ul>";
-            document.getElementById("tabCt").innerHTML = pl_content;
+            setTabContent(pl_content);
           } else
-            document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+            setTabContent('<ul class="tabCntList"><li>Empty.</li></ul>');
         })
         .catch(err => alert(err.message));
 
@@ -1441,9 +1447,9 @@
             for ([idx, item] of podcasts.entries())
               pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${item.name}</li>`;
             pl_content += "</ul>";
-            document.getElementById("tabCt").innerHTML = pl_content;
+            setTabContent(pl_content);
           } else
-            document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+            setTabContent('<ul class="tabCntList"><li>Empty.</li></ul>');
         })
         .catch(err => alert(err.message));
     }
@@ -1535,9 +1541,9 @@
         let pl_content = '<ul class="tabCntList">';
         feed.map((el, idx) => pl_content += `<li class="tabCntLine" data-idx="${idx}" id="li_${idx}">${el.date} - ${el.title} ${el.duration ? '[' + secsToString(el.duration) + ']' : ''}</li><div id="liDesc_${idx}" class="modal" style="display: none;">${el.contentSnippet}</div>`)
         pl_content += "</ul>";
-        document.getElementById("tabCt").innerHTML = pl_content;
+        setTabContent(pl_content);
       } else
-        document.getElementById("tabCt").innerHTML = '<ul class="tabCntList"><li>Empty.</li></ul>';
+        setTabContent('<ul class="tabCntList"><li>Empty.</li></ul>');
     }
 
     const podShow = () => {
