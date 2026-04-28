@@ -125,7 +125,7 @@ function rmOldEpisodes() {
   }
 }
 
-rmOldEpisodes();
+// rmOldEpisodes();
 
 export default {
   getList: getList,
@@ -133,5 +133,6 @@ export default {
   getEpisodes: getEpisodes,
   addFileToQueue: addFileToQueue,
   listDownloadingFiles: listDownloadingFiles,
-  rmDownloadingFile: rmDownloadingFile
+  rmDownloadingFile: rmDownloadingFile,
+  rmOldEpisodes: rmOldEpisodes
 }
