@@ -152,7 +152,8 @@ class MpdService extends EventEmitter {
     });
 
     this.#client.on('error', (err) => {
-      log.error(err.message);
+      log.error(`mpd error: ${err.name} - ${err.message}`);
+      log.error(`mpd error stack: ${err.stack}`);
     });
 
     this.#client.on('system', (name) => {
