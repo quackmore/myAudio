@@ -10,7 +10,7 @@
         "bt_output": "Bluetooth",
         "bt_battery": "/home/flintheart/bin/bt-battery.py",
         "streamingPlaylist": "/home/flintheart/.config/mpd/playlists/streaming.m3u",
-        "streamingReconnectTimeout": 10000,
+        "streamingReconnectTimeout": 5000,
         "streamingReconnectCount": 6,
         "podcastDownloads": "/home/flintheart/Music",
         "podcastRemovedAfterDays": 7
