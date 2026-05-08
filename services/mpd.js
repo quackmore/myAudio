@@ -179,9 +179,13 @@ class MpdService extends EventEmitter {
             const maxRetries = cfg.get('player.streamingReconnectCount');
             if (this.#streamPlayRetry < maxRetries) {
               this.#streamPlayRetry++;
-              const delay = cfg.get('player.streamingReconnectTimeout') * this.#streamPlayRetry;
+              // const delay = cfg.get('player.streamingReconnectTimeout') * this.#streamPlayRetry;
+              const delay = cfg.get('player.streamingReconnectTimeout'); // no backoff
               log.info(`will try to reconnect [${this.#streamPlayRetry}] to stream in ${delay / 1000}s...`);
               setTimeout(() => this.playCmd('play', []), delay);
+            } else {
+              log.error(`max stream reconnect attempts reached (${maxRetries}), giving up`);
+              this.#streamPlayRetry = 0;
             }
           }
         }
@@ -217,19 +221,28 @@ class MpdService extends EventEmitter {
 
   // ── private: status fetcher ───────────────────────────────────────────────
 
-  #updateStatus() {
-    return new Promise((resolve, reject) => {
-      if (!this.#mpdSt.online) return resolve(this.#mpdSt);
-      this.#client.sendCommand(cmd('status', []), (err, msg) => {
-        if (err) { log.error(err.message); return reject(err); }
-        this.#mpdSt.status = parseObj(msg);
-        this.#client.sendCommand(cmd('currentsong', []), (err, msg) => {
-          if (err) { log.error(err.message); return reject(err); }
-          this.#mpdSt.curSong = parseObj(msg);
-          resolve(this.#mpdSt);
-        });
-      });
-    });
+  async #updateStatus() {
+    // return new Promise((resolve, reject) => {
+    //   if (!this.#mpdSt.online) return resolve(this.#mpdSt);
+    //   this.#client.sendCommand(cmd('status', []), (err, msg) => {
+    //     if (err) { log.error(err.message); return reject(err); }
+    //     this.#mpdSt.status = parseObj(msg);
+    //     this.#client.sendCommand(cmd('currentsong', []), (err, msg) => {
+    //       if (err) { log.error(err.message); return reject(err); }
+    //       this.#mpdSt.curSong = parseObj(msg);
+    //       resolve(this.#mpdSt);
+    //     });
+    //   });
+    // });
+    try {
+      const statusMsg = await this.playCmd('status', []);
+      this.#mpdSt.status = parseObj(statusMsg);
+      const curSongMsg = await this.playCmd('currentsong', []);
+      this.#mpdSt.curSong = parseObj(curSongMsg);
+    } catch (err) {
+      log.error(err.message);
+    }
+    return this.#mpdSt;
   }
 }
 
